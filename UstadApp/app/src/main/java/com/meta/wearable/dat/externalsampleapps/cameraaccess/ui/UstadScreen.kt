@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -104,6 +105,9 @@ fun UstadScreen(photo: Bitmap, onDismiss: () -> Unit) {
   var stepIndex by remember { mutableIntStateOf(0) }
   var attempt by remember { mutableIntStateOf(0) }
   var voiceNote by remember { mutableStateOf("") }
+  // Machine history / job report for machines outside the knowledge bases.
+  val data = remember { UstadData(context) }
+  var job by remember { mutableStateOf<com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.JobRecord?>(null) }
 
   fun say(text: String) {
     voiceNote = if (voice.speak(text, language)) "" else "No ${language.promptName} voice installed on this phone"
@@ -228,7 +232,28 @@ fun UstadScreen(photo: Bitmap, onDismiss: () -> Unit) {
             Text("If true: ${dx.expectedIfTrue}", color = Muted, fontSize = 13.sp)
             if (!confirmed) {
               Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { confirmed = true; say("Confirmed. ${dx.partName}.") }, colors = ButtonDefaults.buttonColors(containerColor = Ok)) { Text("Confirmed") }
+                Button(
+                    onClick = {
+                      confirmed = true
+                      job =
+                          com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.JobRecord(
+                              machine = listOf(insp.machine.type, insp.machine.brand, insp.machine.model).filter { it.isNotBlank() }.joinToString(" · "),
+                              machineKey = com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.machineKey(insp.machine.brand, insp.machine.model),
+                              kind = kind.name,
+                              evidence = insp.symptoms.map { "Seen: ${it.symptom} (${it.location})" },
+                              errorCode = insp.errorCode,
+                              cause = dx.partName,
+                              causeChain = dx.causeChain,
+                              confidence = (dx.confidence * 100).toInt(),
+                              test = dx.confirmTest,
+                              safety = insp.safety.hazard,
+                              sources = listOf("AI diagnosis (${client.lastProvider})"),
+                              technician = data.learnerName,
+                          ).also { data.history.save(it) }
+                      say("Confirmed. ${dx.partName}.")
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Ok),
+                ) { Text("Confirmed") }
                 OutlinedButton(
                     enabled = dxIndex < insp.diagnoses.lastIndex,
                     onClick = { dxIndex++; insp.diagnoses.getOrNull(dxIndex)?.let { say("Next suspect: ${it.partName}. ${it.confirmTest}") } },
@@ -241,7 +266,7 @@ fun UstadScreen(photo: Bitmap, onDismiss: () -> Unit) {
 
           if (confirmed) {
             UstadCard("Repair coach") {
-              Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+              Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 CoachLanguage.entries.forEach { lang ->
                   FilterChip(selected = language == lang, onClick = { language = lang }, label = { Text(lang.label) })
                 }
@@ -268,7 +293,11 @@ fun UstadScreen(photo: Bitmap, onDismiss: () -> Unit) {
                       OutlinedButton(onClick = { say(s.say) }) { Text("Repeat", color = Color.White) }
                       Button(onClick = {
                         if (stepIndex < steps.lastIndex) { stepIndex++; say(steps[stepIndex].say) }
-                        else { phase = Phase.Done; say("Repair complete. Report saved.") }
+                        else {
+                          phase = Phase.Done
+                          job = job?.copy(steps = steps.map { it.say }, completed = true)?.also { data.history.save(it) }
+                          say("Repair complete. Report saved.")
+                        }
                       }) { Text(if (stepIndex < steps.lastIndex) "Next" else "Finish") }
                     }
                   }
@@ -276,6 +305,7 @@ fun UstadScreen(photo: Bitmap, onDismiss: () -> Unit) {
                 Phase.Done -> {
                   Text("✅ Fixed: ${dx.partName}", color = Ok, fontWeight = FontWeight.Bold)
                   UstadBody("Steps completed: ${steps.size} · Cause: ${dx.causeChain.firstOrNull().orEmpty()}")
+                  job?.let { j -> OutlinedButton(onClick = { shareText(context, "Ustad job report", j.report()) }) { Text("Share job report", color = Color.White) } }
                 }
                 else -> Unit
               }

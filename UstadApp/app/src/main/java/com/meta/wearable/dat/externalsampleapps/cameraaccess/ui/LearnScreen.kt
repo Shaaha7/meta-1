@@ -8,6 +8,8 @@
 package com.meta.wearable.dat.externalsampleapps.cameraaccess.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -164,7 +166,7 @@ internal fun LearnScreen(lesson: Lesson, client: GeminiClient, data: UstadData, 
     Text(shown.title, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
     if (shown.summary.isNotBlank()) Text(shown.summary, color = Muted, fontSize = 13.sp)
 
-    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
       CoachLanguage.entries.forEach { lang ->
         FilterChip(
             selected = language == lang,

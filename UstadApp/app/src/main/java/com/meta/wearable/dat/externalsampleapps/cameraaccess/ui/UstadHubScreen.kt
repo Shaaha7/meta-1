@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -54,7 +55,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.CaseMemory
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.GeminiClient
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.MachineHistory
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.Lesson
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.LessonStore
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.SkillPassport
@@ -76,6 +79,10 @@ internal class UstadData(context: Context) {
   private val app = context.applicationContext
   val store = LessonStore(File(app.filesDir, "ustad/lessons"))
   val passport = SkillPassport(File(app.filesDir, "ustad/passport.json"))
+  /** Confirmed fixes the brain learns from. */
+  val cases = CaseMemory(File(app.filesDir, "ustad/cases.json"))
+  /** Every visit per machine, for history and job reports. */
+  val history = MachineHistory(File(app.filesDir, "ustad/history.json"))
   private val prefs = app.getSharedPreferences("ustad", Context.MODE_PRIVATE)
 
   var learnerName: String
@@ -228,13 +235,55 @@ private fun HubHome(
       OutlinedButton(onClick = onPassport) { Text("Open passport", color = Color.White) }
     }
 
+    UstadCard("🧠 Brain & machine history") {
+      var version by remember { mutableIntStateOf(0) }
+      val cases = remember(version) { data.cases.all() }
+      val jobs = remember(version) { data.history.all() }
+      val importer =
+          rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+            if (uri == null) return@rememberLauncherForActivityResult
+            val added =
+                runCatching { context.contentResolver.openInputStream(uri)!!.bufferedReader().use { data.cases.import(it.readText()) } }
+            Toast.makeText(
+                    context,
+                    added.fold({ "Learned $it new confirmed fix(es)" }, { "Not an Ustad knowledge file" }),
+                    Toast.LENGTH_SHORT)
+                .show()
+            version++
+          }
+      UstadBody(
+          "Every fix confirmed with a test teaches Ustad. ${cases.size} confirmed fix(es) learned · " +
+              "${jobs.map { it.machineKey }.filter { it.isNotBlank() }.distinct().size} machine(s) in history.")
+      jobs.take(5).forEach { j ->
+        Row(verticalAlignment = Alignment.CenterVertically) {
+          Column(Modifier.weight(1f)) {
+            Text(j.cause, color = Color.White, fontSize = 14.sp)
+            Text(
+                "${j.machine} · ${java.text.DateFormat.getDateInstance(java.text.DateFormat.MEDIUM).format(java.util.Date(j.at))}" +
+                    if (j.completed) " · fixed" else "",
+                color = Muted,
+                fontSize = 12.sp,
+            )
+          }
+          Text("Report", color = Hud, fontSize = 13.sp, modifier = Modifier.clickable { shareText(context, "Ustad job report", j.report()) }.padding(8.dp))
+        }
+      }
+      Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedButton(enabled = cases.isNotEmpty(), onClick = { shareFile(context, "ustad-knowledge.json", "application/json", data.cases.export()) }) {
+          Text("Share knowledge", color = Color.White)
+        }
+        OutlinedButton(onClick = { importer.launch("*/*") }) { Text("Import", color = Color.White) }
+      }
+      Text("Share knowledge sends what this phone learned to another technician; Import merges theirs.", color = Muted, fontSize = 12.sp)
+    }
+
     UstadCard("🔒 What leaves this phone") {
       Text(
           "• Photos and video frames are taken only when you tap.\n" +
               "• Faces are blurred ON the phone before anything is sent.\n" +
               "• For lessons, only ~10 blurred still frames are sent, never the video or its audio.\n" +
               "• The diagnosis model for cars and ACs runs on the phone; the AI only reports what it sees.\n" +
-              "• Lessons and the Skill Passport stay on this phone.\n" +
+              "• Lessons, the Skill Passport, machine history and what the brain learned stay on this phone (shared only when you tap Share).\n" +
               "• Offline mode: a local Llama model on the laptop, nothing goes to the internet.",
           color = Color.White,
           fontSize = 13.sp,
@@ -244,6 +293,69 @@ private fun HubHome(
 }
 
 // ---------- shared helpers for the Ustad screens ----------
+
+/** Opens the system share sheet with plain text (job reports). */
+internal fun shareText(context: Context, subject: String, text: String) {
+  val send =
+      android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+        type = "text/plain"
+        putExtra(android.content.Intent.EXTRA_SUBJECT, subject)
+        putExtra(android.content.Intent.EXTRA_TEXT, text)
+      }
+  context.startActivity(android.content.Intent.createChooser(send, subject).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+}
+
+/** Shares a file from Ustad's cache folder (exported brain knowledge). */
+internal fun shareFile(context: Context, name: String, mime: String, text: String) {
+  val dir = File(context.cacheDir, "ustad").apply { mkdirs() }
+  val file = File(dir, name).apply { writeText(text) }
+  val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+  val send =
+      android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+        type = mime
+        putExtra(android.content.Intent.EXTRA_STREAM, uri)
+        addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+      }
+  context.startActivity(android.content.Intent.createChooser(send, name).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+}
+
+/** Ustad's reasoning graph (assets/ustad/kb_graph.html), drawn from BrainGraph.reasoningGraph. */
+@android.annotation.SuppressLint("SetJavaScriptEnabled")
+@Composable
+internal fun BrainGraphView(graphJson: String) {
+  val rows = remember(graphJson) {
+    runCatching {
+      val o = JSONObject(graphJson)
+      maxOf(o.getJSONArray("symptoms").length(), o.getJSONArray("failures").length(), o.getJSONArray("parts").length(), 1)
+    }.getOrDefault(6)
+  }
+  val js = "graph($graphJson);"
+  androidx.compose.ui.viewinterop.AndroidView(
+      factory = { ctx ->
+        android.webkit.WebView(ctx).apply {
+          settings.javaScriptEnabled = true
+          setBackgroundColor(android.graphics.Color.rgb(7, 12, 24))
+          webViewClient =
+              object : android.webkit.WebViewClient() {
+                override fun onPageFinished(view: android.webkit.WebView, url: String?) {
+                  view.setTag(android.R.id.title, true)
+                  (view.tag as? String)?.let { view.evaluateJavascript(it, null) }
+                }
+              }
+          tag = js
+          loadUrl("file:///android_asset/ustad/kb_graph.html")
+        }
+      },
+      update = { view ->
+        if (view.tag != js) {
+          view.tag = js
+          if (view.getTag(android.R.id.title) == true) view.evaluateJavascript(js, null)
+        }
+      },
+      // Same aspect ratio as the SVG (400 wide, 24 + 40 per row tall) plus the legend.
+      modifier = Modifier.fillMaxWidth().aspectRatio(400f / (24 + rows * 40 + 44)),
+  )
+}
 
 /** Full-screen dark scrolling page used by all Ustad screens. */
 @Composable

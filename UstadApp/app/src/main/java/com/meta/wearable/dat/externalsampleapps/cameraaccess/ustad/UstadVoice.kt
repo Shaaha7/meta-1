@@ -31,6 +31,11 @@ enum class CoachLanguage(val label: String, val promptName: String, val locale: 
   ENGLISH("English", "English", Locale.US),
   HINDI("हिन्दी", "Hindi", Locale("hi", "IN")),
   ARABIC("العربية", "Arabic", Locale("ar")),
+  // The UAE's technician workforce: phone voices for these may need installing (Settings → TTS);
+  // ElevenLabs multilingual voices cover more of them.
+  URDU("اردو", "Urdu", Locale("ur", "PK")),
+  MALAYALAM("മലയാളം", "Malayalam", Locale("ml", "IN")),
+  TAGALOG("Tagalog", "Tagalog (Filipino)", Locale("fil", "PH")),
 }
 
 class UstadVoice(context: Context) {

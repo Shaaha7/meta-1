@@ -2,11 +2,16 @@
 //
 // The AI only reported what it can see; UstadBrain ranks the causes, asks the most useful next
 // question, and the fix steps come from the knowledge base with their sources. The AI is used
-// here only to translate those steps into Hindi or Arabic.
+// here only to translate those steps.
+//
+// The brain learns: every CONFIRMED fix is saved as a case (with what was seen) and to the
+// machine's history. Next time, the same make and model ranks that cause higher. The screen shows
+// what the brain learned from, why it ranks the leading cause first, and its reasoning graph.
 
 package com.meta.wearable.dat.externalsampleapps.cameraaccess.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -19,6 +24,8 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -35,7 +42,12 @@ import com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.CoachLanguage
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.GeminiClient
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.Inspection
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.KnowledgeBase
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.ConfirmedCase
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.JobRecord
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.MachineKind
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.machineKey
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.reasoningGraph
+import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.launch
 
 @Composable
@@ -49,6 +61,17 @@ fun ExpertPanel(
     say: (String) -> Unit,
 ) {
   val scope = rememberCoroutineScope()
+  val context = LocalContext.current
+  val data = remember { UstadData(context) }
+  val kbId = kind.kbFile.orEmpty()
+  val key = machineKey(insp.machine.brand, insp.machine.model)
+  val machineName = listOf(insp.machine.type, insp.machine.brand, insp.machine.model).filter { it.isNotBlank() }.joinToString(" · ")
+  // Re-learn whenever a fix is confirmed or undone on this screen.
+  var brainVersion by remember { mutableIntStateOf(0) }
+  val brain = remember(brainVersion) { kb.learned(data.cases.cases(kbId), key) }
+  val pastVisits = remember(brainVersion) { data.history.forMachine(key) }
+  var job by remember { mutableStateOf<JobRecord?>(null) }
+  var showGraph by remember { mutableStateOf(false) }
   // Evidence: camera observations first, then the technician's answers. Error codes count as a symptom.
   var evidence by remember {
     // An error code on an AC display, or a fault code / warning on a car dashboard.
@@ -65,11 +88,19 @@ fun ExpertPanel(
   var stepIndex by remember { mutableIntStateOf(-1) }
   var loadingSteps by remember { mutableStateOf(false) }
 
-  val ranked = kb.rank(evidence, ruledOut)
+  val ranked = brain.rank(evidence, ruledOut)
   val top = ranked.firstOrNull() ?: return
-  val confirmed = confirmedId?.let { id -> kb.failures.first { it.id == id } }
+  val confirmed = confirmedId?.let { id -> brain.failures.first { it.id == id } }
   val focus = confirmed ?: top.failure
-  val question = if (confirmed == null) kb.nextQuestion(evidence, ruledOut, skipped) else null
+  val question = if (confirmed == null) brain.nextQuestion(evidence, ruledOut, skipped) else null
+
+  // Repair finished → the visit is marked complete in the machine history.
+  LaunchedEffect(stepIndex, steps) {
+    val j = job
+    if (j != null && steps.isNotEmpty() && stepIndex >= steps.size && !j.completed) {
+      job = j.copy(steps = steps, completed = true).also { data.history.save(it) }
+    }
+  }
 
   // Speak a short summary whenever the leading cause or the question changes.
   LaunchedEffect(top.failure.id, question?.id, confirmedId) {
@@ -80,6 +111,34 @@ fun ExpertPanel(
     Text(listOf(insp.machine.type, insp.machine.brand, insp.machine.model).filter { it.isNotBlank() }.joinToString(" · "), color = Color.White, fontWeight = FontWeight.Bold)
     Text("Expert mode · ${kb.title} knowledge base · causes ranked by Ustad's model, not AI guesses", color = Ok, fontSize = 12.sp)
     if (insp.errorCode.isNotBlank()) Text("Error code read: ${insp.errorCode}", color = Color(0xFFFBBF24), fontSize = 13.sp)
+  }
+
+  UstadCard("🧠 Ustad's brain") {
+    UstadBody(
+        "${kb.failures.size} failure modes · ${kb.symptoms.size} symptoms · ${kb.sourceCount} sources" +
+            if (brain.learnedCases == 0) " · no confirmed fixes yet"
+            else " · learned from ${brain.learnedCases} confirmed fix(es), ${brain.modelCases} on this model")
+    if (brain.modelHistory.isNotEmpty()) {
+      Text(
+          "This model before: " + brain.modelHistory.entries.joinToString(", ") { (id, n) ->
+            "${brain.failures.firstOrNull { it.id == id }?.name ?: id} ×$n"
+          },
+          color = Color(0xFFFBBF24),
+          fontSize = 13.sp,
+      )
+    }
+    pastVisits.take(3).forEach { v ->
+      Text(
+          "• ${java.text.DateFormat.getDateInstance(java.text.DateFormat.MEDIUM).format(java.util.Date(v.at))}: ${v.cause}" +
+              if (v.completed) " (fixed)" else "",
+          color = Muted,
+          fontSize = 12.sp,
+      )
+    }
+    OutlinedButton(onClick = { showGraph = !showGraph }) { Text(if (showGraph) "Hide reasoning graph" else "Show reasoning graph", color = Color.White) }
+    if (showGraph) {
+      BrainGraphView(brain.reasoningGraph(evidence, ruledOut, kind.parts, focusId = focus.id).toString())
+    }
   }
 
   UstadCard("Evidence") {
@@ -97,6 +156,20 @@ fun ExpertPanel(
     (if (confirmed != null) listOf(top.copy(failure = confirmed, probability = 1.0)) else ranked.take(3)).forEachIndexed { i, r ->
       Row { Text(r.failure.name, color = if (i == 0) Color.White else Muted, modifier = Modifier.weight(1f)); Text("${(r.probability * 100).toInt()}%", color = Color.White) }
       LinearProgressIndicator(progress = { r.probability.toFloat() }, color = if (i == 0) Fault else Hud, trackColor = Color(0xFF13213D), modifier = Modifier.fillMaxWidth())
+    }
+  }
+
+  val weights = remember(brain, evidence, ruledOut, focus.id) { brain.explain(focus.id, evidence, ruledOut) }
+  if (weights.isNotEmpty() && confirmed == null) {
+    UstadCard("Why Ustad ranks this first") {
+      weights.take(5).forEach { w ->
+        Row {
+          Text("${if (w.present) "✓" else "✗"} ${w.symptom.label}", color = Color.White, fontSize = 14.sp, modifier = Modifier.weight(1f))
+          Text(w.verdict, color = if (w.weight > 0.4) Ok else if (w.weight < -0.4) Fault else Muted, fontSize = 12.sp)
+        }
+      }
+      val seen = brain.modelHistory[focus.id] ?: 0
+      if (seen > 0) Text("+ confirmed $seen× before on this model", color = Color(0xFFFBBF24), fontSize = 13.sp)
     }
   }
 
@@ -126,13 +199,58 @@ fun ExpertPanel(
       UstadBody("🧪 ${top.failure.test}")
       Text("If it's this: ${top.failure.expected}", color = Muted, fontSize = 13.sp)
       Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Button(onClick = { confirmedId = top.failure.id; say("Confirmed. ${top.failure.name}.") }, colors = ButtonDefaults.buttonColors(containerColor = Ok)) { Text("Confirmed") }
+        Button(
+            onClick = {
+              val f = top.failure
+              confirmedId = f.id
+              // The brain learns from this case, and the visit goes into the machine's history.
+              data.cases.add(ConfirmedCase(kbId, key, f.id, evidence, by = data.learnerName))
+              job =
+                  JobRecord(
+                      machine = machineName,
+                      machineKey = key,
+                      kind = kind.name,
+                      evidence = evidence.mapNotNull { (id, present) -> kb.symptoms[id]?.let { "${if (present) "Seen" else "Not seen"}: ${it.label}" } },
+                      errorCode = insp.errorCode,
+                      cause = f.name,
+                      causeChain = f.causeChain,
+                      confidence = (top.probability * 100).toInt(),
+                      test = f.test,
+                      steps = f.fix,
+                      safety = f.safety,
+                      sources = f.sources.map { "${it.name} (${it.url})" },
+                      technician = data.learnerName,
+                  ).also { data.history.save(it) }
+              brainVersion++
+              say("Confirmed. ${f.name}. Ustad will remember this.")
+            },
+            colors = ButtonDefaults.buttonColors(containerColor = Ok),
+        ) { Text("Confirmed") }
         OutlinedButton(enabled = ranked.size > 1, onClick = { ruledOut = ruledOut + top.failure.id }) { Text("Not this, next", color = Color.White) }
       }
     }
   } else {
+    UstadCard("Learned") {
+      UstadBody("Saved to Ustad's brain and this machine's history. Next time, this cause ranks higher for ${insp.machine.brand.ifBlank { "this machine" }} ${insp.machine.model}.")
+      Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        job?.let { j -> OutlinedButton(onClick = { shareText(context, "Ustad job report", j.report()) }) { Text("Share job report", color = Color.White) } }
+        Text(
+            "Undo",
+            color = Fault,
+            fontSize = 13.sp,
+            modifier = Modifier.padding(top = 12.dp).clickable {
+              data.cases.undo(kbId, key, confirmed.id)
+              job?.let { data.history.delete(it.id) }
+              job = null
+              confirmedId = null
+              stepIndex = -1
+              brainVersion++
+            },
+        )
+      }
+    }
     UstadCard("Repair coach") {
-      Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+      Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         CoachLanguage.entries.forEach { lang -> FilterChip(selected = language == lang, onClick = { onLanguage(lang); stepIndex = -1 }, label = { Text(lang.label) }) }
       }
       when {

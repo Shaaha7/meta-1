@@ -6,6 +6,18 @@ Android prototype for Meta Wearables Studio UAE. Built on Meta's CameraAccess sa
 
 **Teach → Learn:** expert records a job → ~10 face-blurred key frames → AI drafts a lesson (steps, why, safety, checkpoints, quiz, 3D part per step) → expert reviews and publishes → learner is guided hands-free, shows checkpoint photos, takes the quiz → Skill Passport score.
 
+## Ustad's brain
+
+Machines in the knowledge base (cars, split ACs) are diagnosed by Ustad's own model, not by the AI. The AI only reports what it can see.
+
+- **Knowledge graph:** symptom → failure mode → internal part, with how likely each symptom is under each failure, a prove-it test, fix steps and sources (`assets/ustad/kb/*.json`). The **reasoning graph** view draws the part that matters for the current job.
+- **Ranking:** Bayesian. P(failure | evidence) ∝ prior × Π P(symptom | failure).
+- **Next best question:** the unanswered symptom with the highest information gain.
+- **Explains itself:** for the leading cause, how strongly each piece of evidence supports it or argues against it.
+- **Learns from confirmed fixes:** each fix a technician confirms with the test is stored as a case. Following decision-theoretic troubleshooting (Heckerman, Breese & Rommelse, Microsoft Research), the knowledge base counts as 20 cases of prior knowledge (Dirichlet/Beta pseudo-counts) and every confirmed case updates the priors and symptom likelihoods. A fix on the **same make and model counts 4×**, so a model's recurring fault rises to #1. Learning is recomputed from the case list, so it can be audited, undone or shared.
+- **Shared knowledge:** *Share knowledge* exports what a phone learned; *Import* merges another technician's file.
+- **Machine history and job reports:** every confirmed visit is saved per machine and can be shared as a job report.
+
 ## Setup
 
 1. Open this folder in Android Studio and let Gradle sync.
@@ -35,6 +47,8 @@ Tap the **USTAD** button on the left edge of any screen. The phone camera and ga
 - **Teach:** record a video of the expert doing the job (or pick one), add a one-line note, **Build lesson**, then review and **Approve & publish**.
 - **Lessons:** two built-in car lessons (12V battery terminals, tire check) work with **no AI at all**, so they're a safe demo path. Checkpoint photos use the AI; if it's unreachable, the trainer can confirm instead.
 - **Skill Passport:** score = 60% quiz + 40% checkpoints passed first time.
+- **Brain & machine history:** confirmed fixes learned, recent jobs (shareable reports), share or import knowledge.
+- **Languages:** English, Hindi, Arabic, Urdu, Malayalam, Tagalog. Phone voices for some may need installing; ElevenLabs covers more.
 
 ## Run with Mock Device Kit (simulated glasses)
 
@@ -55,7 +69,10 @@ ffmpeg -i ac_leak.mp4 -c:v libx265 -tag:v hvc1 -vf "scale=540:960" -an ac_leak_h
 | File | What it does |
 |---|---|
 | `ustad/GeminiClient.kt` | Prompts + AI calls (inspect, lesson from frames, checkpoint check, translate); Gemini → OpenRouter → local Llama |
-| `ustad/UstadBrain.kt` | Knowledge-base model: Bayesian cause ranking + next best question |
+| `ustad/UstadBrain.kt` | Brain: Bayesian cause ranking, next best question, learning from confirmed fixes, evidence explanation |
+| `ustad/Experience.kt` | Confirmed-fix memory (export/import), machine history, job reports |
+| `ustad/BrainGraph.kt` | Reasoning graph: evidence → causes → parts |
+| `assets/ustad/kb_graph.html` | Draws the reasoning graph |
 | `ustad/MachineRouter.kt` | Which expert handles a machine (car / split AC / other) and its 3D model |
 | `ustad/Lesson.kt` | Lessons, lesson store, Skill Passport |
 | `ustad/VideoFrames.kt` | Key frames from an expert video (face-blurred) |
@@ -85,4 +102,4 @@ ffmpeg -i ac_leak.mp4 -c:v libx265 -tag:v hvc1 -vf "scale=540:960" -an ac_leak_h
 ./gradlew :app:testDebugUnitTest
 ```
 
-They cover the knowledge-base model and data integrity (every failure maps to a part of its 3D model), machine routing (regression test for "washing m**ac**hine" being treated as an AC), lessons and the Skill Passport.
+They cover the brain (ranking, learning from confirmed fixes, explanations, reasoning graph), knowledge-base data integrity (every failure maps to a part of its 3D model), machine routing (regression test for "washing m**ac**hine" being treated as an AC), lessons and the Skill Passport.
