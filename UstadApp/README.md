@@ -18,6 +18,20 @@ Machines in the knowledge base (cars, split ACs) are diagnosed by Ustad's own mo
 - **Shared knowledge:** *Share knowledge* exports what a phone learned; *Import* merges another technician's file.
 - **Machine history and job reports:** every confirmed visit is saved per machine and can be shared as a job report.
 
+## Talk to Ustad (voice)
+
+- **Ustad speaks** with a natural **ElevenLabs** voice: Flash v2.5 (low latency, 32 languages) for English, Hindi, Arabic and Tagalog, and Eleven v3 for Urdu and Malayalam. Each line is cached, so repeats cost no credits. Tap **🗣 Natural / 🤖 Phone** to switch to the phone's built-in voice. Ustad falls back to it automatically when there's no key or no network.
+- **Ustad listens:** tap **🎙 Talk**, or switch on **Hands-free** so the mic opens every time Ustad finishes speaking. It never listens while it talks.
+- **Commands** in English, Hindi, Arabic, Urdu, Malayalam and Tagalog (mixing is fine): next, back, repeat, why, yes, no, not sure, confirmed, not this, stop, and quiz answers by number.
+- **Ask Ustad:** any longer sentence is a question. It's answered in a few spoken words from the current job (step, why, cause chain, safety, sources). Anything unsafe gets "Stop, call a professional".
+
+```properties
+ELEVENLABS_API_KEY=your_key
+# optional: ELEVENLABS_VOICE_ID=... (any voice from your ElevenLabs library)
+```
+
+Speech recognition uses Android's recognizer and stays on the phone when that language's offline pack is installed.
+
 ## Setup
 
 1. Open this folder in Android Studio and let Gradle sync.
@@ -84,8 +98,11 @@ ffmpeg -i ac_leak.mp4 -c:v libx265 -tag:v hvc1 -vf "scale=540:960" -an ac_leak_h
 | `assets/ustad/kb/*.json` | Knowledge bases: car, split AC (symptoms, failures, tests, fixes, sources) |
 | `assets/ustad/lessons/*.json` | Built-in lessons |
 | `ustad/UstadModels.kt` | JSON → diagnosis / repair models |
+| `ustad/UstadVoice.kt` | Ustad's voice: ElevenLabs (Flash v2.5 / v3 by language) or phone voice, with "finished speaking" callback |
+| `ustad/UstadEar.kt` | Listening: Android speech recognition in the coaching language |
+| `ustad/VoiceCommands.kt` | What was said → command, quiz answer or question (6 languages) |
+| `ui/VoiceBar.kt` | Voice loop (speak → listen → act), Talk / Hands-free / voice switch, Ask Ustad |
 | `ustad/PrivacyFilter.kt` | On-device face blur before upload (ML Kit, fallback: platform detector) |
-| `ustad/UstadVoice.kt` | Text-to-speech in EN / HI / AR |
 | `ui/UstadScreen.kt` | Look → Reveal → Confirm → Fix screen |
 | `assets/ustad/split_ac_indoor.html` | Exploded view of a split AC indoor unit |
 | `ui/CameraScreen.kt` | Hook: captured photo opens Ustad |

@@ -43,6 +43,8 @@ import com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.GeminiClient
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.Inspection
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.KnowledgeBase
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.ConfirmedCase
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.Heard
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.VoiceCommand
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.JobRecord
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.MachineKind
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.machineKey
@@ -59,6 +61,8 @@ fun ExpertPanel(
     language: CoachLanguage,
     onLanguage: (CoachLanguage) -> Unit,
     say: (String) -> Unit,
+    loop: VoiceLoop? = null,
+    onAsked: (Pair<String, String>) -> Unit = {},
 ) {
   val scope = rememberCoroutineScope()
   val context = LocalContext.current
@@ -99,6 +103,66 @@ fun ExpertPanel(
     val j = job
     if (j != null && steps.isNotEmpty() && stepIndex >= steps.size && !j.completed) {
       job = j.copy(steps = steps, completed = true).also { data.history.save(it) }
+    }
+  }
+
+  /** The prove-it test passed: Ustad learns from this case and the visit goes into the history. */
+  fun confirmTop() {
+    if (confirmedId != null) return
+    val f = top.failure
+    confirmedId = f.id
+    // The brain learns from this case, and the visit goes into the machine's history.
+    data.cases.add(ConfirmedCase(kbId, key, f.id, evidence, by = data.learnerName))
+    job =
+        JobRecord(
+            machine = machineName,
+            machineKey = key,
+            kind = kind.name,
+            evidence = evidence.mapNotNull { (id, present) -> kb.symptoms[id]?.let { "${if (present) "Seen" else "Not seen"}: ${it.label}" } },
+            errorCode = insp.errorCode,
+            cause = f.name,
+            causeChain = f.causeChain,
+            confidence = (top.probability * 100).toInt(),
+            test = f.test,
+            steps = f.fix,
+            safety = f.safety,
+            sources = f.sources.map { "${it.name} (${it.url})" },
+            technician = data.learnerName,
+        ).also { data.history.save(it) }
+    brainVersion++
+    say("Confirmed. ${f.name}. Ustad will remember this.")
+  }
+
+  // Voice: answer Ustad's question, prove it, coach the repair, or ask anything.
+  if (loop != null) loop.onHeard = { heard ->
+    val q = question
+    when (heard) {
+      is Heard.Question ->
+          askUstad(
+              scope, client, loop, heard.text,
+              "Machine: $machineName. Leading cause: ${focus.name} " +
+                  "(${(top.probability * 100).toInt()}%). Cause chain: ${focus.causeChain.joinToString(" -> ")}. " +
+                  "Test: ${focus.test} Expected: ${focus.expected} Safety: ${focus.safety} " +
+                  "Fix: ${focus.fix.joinToString(" ")} Sources: ${focus.sources.joinToString { it.name }}",
+              onAsked)
+      is Heard.Command ->
+          when (heard.command) {
+            VoiceCommand.YES -> if (q != null) { evidence = evidence + (q.id to true); answeredByUser = answeredByUser + q.id }
+            VoiceCommand.NO -> if (q != null) { evidence = evidence + (q.id to false); answeredByUser = answeredByUser + q.id }
+            VoiceCommand.NOT_SURE -> if (q != null) skipped = skipped + q.id
+            VoiceCommand.WHY -> say(focus.causeChain.joinToString(". "))
+            VoiceCommand.NOT_THIS -> if (confirmed == null && ranked.size > 1) ruledOut = ruledOut + top.failure.id
+            VoiceCommand.CONFIRMED ->
+                if (confirmed == null) confirmTop()
+                else if (stepIndex in 0 until steps.size) { stepIndex++; say(if (stepIndex < steps.size) steps[stepIndex] else "Repair complete.") }
+            VoiceCommand.NEXT -> if (stepIndex in 0 until steps.size) { stepIndex++; say(if (stepIndex < steps.size) steps[stepIndex] else "Repair complete.") }
+            VoiceCommand.BACK -> if (stepIndex in 1 until steps.size) { stepIndex--; say(steps[stepIndex]) }
+            VoiceCommand.REPEAT ->
+                say(if (stepIndex in steps.indices) steps[stepIndex] else q?.question ?: "${top.failure.name}. ${top.failure.test}")
+            VoiceCommand.STOP -> loop.stopAll()
+            VoiceCommand.CHECK -> Unit
+          }
+      else -> Unit
     }
   }
 
@@ -200,30 +264,7 @@ fun ExpertPanel(
       Text("If it's this: ${top.failure.expected}", color = Muted, fontSize = 13.sp)
       Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Button(
-            onClick = {
-              val f = top.failure
-              confirmedId = f.id
-              // The brain learns from this case, and the visit goes into the machine's history.
-              data.cases.add(ConfirmedCase(kbId, key, f.id, evidence, by = data.learnerName))
-              job =
-                  JobRecord(
-                      machine = machineName,
-                      machineKey = key,
-                      kind = kind.name,
-                      evidence = evidence.mapNotNull { (id, present) -> kb.symptoms[id]?.let { "${if (present) "Seen" else "Not seen"}: ${it.label}" } },
-                      errorCode = insp.errorCode,
-                      cause = f.name,
-                      causeChain = f.causeChain,
-                      confidence = (top.probability * 100).toInt(),
-                      test = f.test,
-                      steps = f.fix,
-                      safety = f.safety,
-                      sources = f.sources.map { "${it.name} (${it.url})" },
-                      technician = data.learnerName,
-                  ).also { data.history.save(it) }
-              brainVersion++
-              say("Confirmed. ${f.name}. Ustad will remember this.")
-            },
+            onClick = { confirmTop() },
             colors = ButtonDefaults.buttonColors(containerColor = Ok),
         ) { Text("Confirmed") }
         OutlinedButton(enabled = ranked.size > 1, onClick = { ruledOut = ruledOut + top.failure.id }) { Text("Not this, next", color = Color.White) }

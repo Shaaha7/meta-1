@@ -277,6 +277,27 @@ private fun HubHome(
       Text("Share knowledge sends what this phone learned to another technician; Import merges theirs.", color = Muted, fontSize = 12.sp)
     }
 
+    UstadCard("🗣 Ustad's voice") {
+      var natural by remember { mutableStateOf(com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.UstadVoice.isNatural(context)) }
+      val hasKey = com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.UstadVoice.hasElevenLabsKey
+      UstadBody(
+          if (!hasKey) "Phone voice. Add ELEVENLABS_API_KEY to local.properties for Ustad's natural ElevenLabs voice."
+          else if (natural) "Natural ElevenLabs voice (Flash v2.5; Eleven v3 for Urdu and Malayalam)."
+          else "Phone voice (robotic, works offline).")
+      if (hasKey) {
+        OutlinedButton(onClick = {
+          natural = !natural
+          com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.UstadVoice.setNatural(context, natural)
+        }) { Text(if (natural) "Use phone voice" else "Use natural voice", color = Color.White) }
+      }
+      Text(
+          "Talk back: tap 🎙 or switch on Hands-free. Say “next”, “back”, “repeat”, “why”, “yes”, “no”, “not sure”, " +
+              "“confirmed”, “not this”, “stop”, in any of the six languages, or ask any question about the job.",
+          color = Muted,
+          fontSize = 12.sp,
+      )
+    }
+
     UstadCard("🔒 What leaves this phone") {
       Text(
           "• Photos and video frames are taken only when you tap.\n" +
@@ -284,6 +305,7 @@ private fun HubHome(
               "• For lessons, only ~10 blurred still frames are sent, never the video or its audio.\n" +
               "• The diagnosis model for cars and ACs runs on the phone; the AI only reports what it sees.\n" +
               "• Lessons, the Skill Passport, machine history and what the brain learned stay on this phone (shared only when you tap Share).\n" +
+              "• Voice: what you say is recognised on the phone when the offline language pack is installed; Ustad's spoken lines go to ElevenLabs only with the natural voice on.\n" +
               "• Offline mode: a local Llama model on the laptop, nothing goes to the internet.",
           color = Color.White,
           fontSize = 13.sp,

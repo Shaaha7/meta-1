@@ -226,6 +226,32 @@ class GeminiClient(
     return parseRepairSteps(generate(prompt, emptyList()))
   }
 
+  /**
+   * Ask Ustad: a spoken question from the technician, answered from [context] (the current step,
+   * cause chain, safety notes and sources) in a few spoken words. Unsafe → stop and call a pro.
+   */
+  suspend fun answer(question: String, context: String, language: String): String {
+    val prompt =
+        """
+        You are Ustad, a calm master technician speaking in the ear of a technician whose hands
+        are busy. They just asked: "$question"
+
+        What you know about the current job (prefer it over general knowledge):
+        $context
+
+        Rules:
+        - Answer in $language, max 35 words, plain spoken words, no lists or symbols.
+        - Be practical: what to do or why, like an experienced mentor.
+        - If the answer is not in the context and you are not sure, say so and suggest asking
+          the trainer. Never guess about electricity, high voltage, fuel, refrigerant or pressure.
+        - If what they describe is unsafe, start with "Stop." and tell them to call a
+          certified professional.
+        Return ONLY JSON: {"answer":""}
+        """
+            .trimIndent()
+    return generate(prompt, emptyList()).optString("answer").ifBlank { throw GeminiException("No answer", retryable = true) }
+  }
+
   /** Translation only: the knowledge base is written in English; the LLM must not add content. */
   suspend fun translate(lines: List<String>, language: String): List<String> {
     if (lines.isEmpty() || language == "English") return lines

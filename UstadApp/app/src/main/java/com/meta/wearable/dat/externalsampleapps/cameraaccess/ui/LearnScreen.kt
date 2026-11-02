@@ -24,7 +24,6 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -46,7 +45,8 @@ import com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.MachineKind
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.PassportEntry
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.PrivacyFilter
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.StepCheck
-import com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.UstadVoice
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.Heard
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.VoiceCommand
 import java.text.DateFormat
 import java.util.Date
 import kotlinx.coroutines.launch
@@ -77,8 +77,9 @@ private suspend fun translateLesson(client: GeminiClient, lesson: Lesson, langua
 internal fun LearnScreen(lesson: Lesson, client: GeminiClient, data: UstadData, onExit: () -> Unit) {
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
-  val voice = remember { UstadVoice(context) }
-  DisposableEffect(Unit) { onDispose { voice.shutdown() } }
+  // Voice loop: Ustad speaks (ElevenLabs or phone voice), then listens for "next", "why", a quiz
+  // answer, or any question about the job.
+  val loop = rememberVoiceLoop()
 
   var language by remember { mutableStateOf(CoachLanguage.ENGLISH) }
   var shown by remember { mutableStateOf(lesson) }
@@ -99,9 +100,11 @@ internal fun LearnScreen(lesson: Lesson, client: GeminiClient, data: UstadData, 
   var quizCorrect by remember { mutableIntStateOf(0) }
   var result by remember { mutableStateOf<PassportEntry?>(null) }
   var voiceNote by remember { mutableStateOf("") }
+  var asked by remember { mutableStateOf<Pair<String, String>?>(null) }
 
   fun say(text: String) {
-    voiceNote = if (voice.speak(text, language)) "" else "No ${language.promptName} voice installed on this phone"
+    loop.language = language
+    loop.say(text)
   }
 
   val step = shown.steps.getOrNull(stepIndex)
@@ -110,6 +113,85 @@ internal fun LearnScreen(lesson: Lesson, client: GeminiClient, data: UstadData, 
   fun finishSteps() {
     if (shown.quiz.isEmpty()) phase = LearnPhase.DONE
     else { phase = LearnPhase.QUIZ; say(shown.quiz.first().question) }
+  }
+
+  fun nextStep() {
+    showWhy = false
+    if (stepIndex >= shown.steps.lastIndex) finishSteps() else stepIndex++
+  }
+
+  fun explainStep() {
+    val s = shown.steps.getOrNull(stepIndex) ?: return
+    if (s.why.isBlank()) { say("There's no extra note for this step. Ask me anything about it."); return }
+    if (!showWhy) whyAsked++
+    showWhy = true
+    say(s.why)
+  }
+
+  fun pickOption(oi: Int) {
+    val q = shown.quiz.getOrNull(quizIndex) ?: return
+    if (chosen != null || oi !in q.options.indices) return
+    val answerIndex = lesson.quiz.getOrNull(quizIndex)?.answer ?: 0
+    chosen = oi
+    if (oi == answerIndex) quizCorrect++
+    say((if (oi == answerIndex) "Correct. " else "Not quite. ") + q.explain)
+  }
+
+  fun nextQuestion() {
+    if (chosen == null) return
+    chosen = null
+    if (quizIndex < shown.quiz.lastIndex) { quizIndex++; say(shown.quiz[quizIndex].question) }
+    else phase = LearnPhase.DONE
+  }
+
+  /** Ask Ustad: a free spoken question, answered from this lesson and the current step. */
+  fun ask(question: String) {
+    val s = lesson.steps.getOrNull(stepIndex)
+    val facts =
+        buildString {
+          appendLine("Lesson: ${lesson.title} (${lesson.machine}). ${lesson.summary}")
+          if (s != null && phase == LearnPhase.STEPS) {
+            appendLine("Current step ${stepIndex + 1}: ${s.say}")
+            if (s.why.isNotBlank()) appendLine("Why (expert's note): ${s.why}")
+            if (s.safety.isNotBlank()) appendLine("Safety: ${s.safety}")
+            if (s.checkpoint) appendLine("Checkpoint: the photo must show ${s.mustShow}")
+          }
+          appendLine("All steps: " + lesson.steps.mapIndexed { i, x -> "${i + 1}. ${x.say}" }.joinToString(" "))
+        }
+    loop.language = language
+    askUstad(scope, client, loop, question, facts) { asked = it }
+  }
+
+  // What the learner said → what Ustad does.
+  loop.language = language
+  loop.onHeard = { heard ->
+    when (heard) {
+      is Heard.Question -> ask(heard.text)
+      is Heard.Option -> if (phase == LearnPhase.QUIZ) pickOption(heard.index) else ask(loop.heard)
+      is Heard.Command ->
+          when (phase) {
+            LearnPhase.STEPS ->
+                when (heard.command) {
+                  VoiceCommand.NEXT, VoiceCommand.CONFIRMED, VoiceCommand.YES -> nextStep()
+                  VoiceCommand.BACK -> if (stepIndex > 0) { stepIndex--; showWhy = false }
+                  VoiceCommand.REPEAT -> shown.steps.getOrNull(stepIndex)?.let { say(it.say) }
+                  VoiceCommand.WHY -> explainStep()
+                  VoiceCommand.STOP -> loop.stopAll()
+                  else -> Unit
+                }
+            LearnPhase.QUIZ ->
+                when (heard.command) {
+                  VoiceCommand.NEXT, VoiceCommand.CONFIRMED -> nextQuestion()
+                  VoiceCommand.REPEAT -> shown.quiz.getOrNull(quizIndex)?.let { q ->
+                    say(q.question + " " + q.options.mapIndexed { i, o -> "${i + 1}: $o." }.joinToString(" "))
+                  }
+                  VoiceCommand.STOP -> loop.stopAll()
+                  else -> Unit
+                }
+            LearnPhase.DONE -> if (heard.command == VoiceCommand.STOP) loop.stopAll()
+          }
+      Heard.Nothing -> Unit
+    }
   }
 
   val checkPhoto = rememberPhotoCapture { photo ->
@@ -161,7 +243,7 @@ internal fun LearnScreen(lesson: Lesson, client: GeminiClient, data: UstadData, 
     Row(verticalAlignment = Alignment.CenterVertically) {
       Text("LEARN", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
       Spacer(Modifier.weight(1f))
-      OutlinedButton(onClick = { voice.stop(); onExit() }) { Text("Exit", color = Color.White) }
+      OutlinedButton(onClick = { loop.stopAll(); onExit() }) { Text("Exit", color = Color.White) }
     }
     Text(shown.title, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
     if (shown.summary.isNotBlank()) Text(shown.summary, color = Muted, fontSize = 13.sp)
@@ -190,6 +272,9 @@ internal fun LearnScreen(lesson: Lesson, client: GeminiClient, data: UstadData, 
       }
     }
     if (translating) UstadBusy("Translating to ${language.promptName}…")
+
+    VoiceBar(loop, hint = "Say “next”, “why”, “repeat”, or ask anything about this step.")
+    AskUstadCard(asked)
 
     UstadCard("Inside view") {
       ExplodedView(
@@ -236,18 +321,11 @@ internal fun LearnScreen(lesson: Lesson, client: GeminiClient, data: UstadData, 
               Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(enabled = stepIndex > 0, onClick = { stepIndex--; showWhy = false }) { Text("Back", color = Color.White) }
                 OutlinedButton(onClick = { say(step.say) }) { Text("Repeat", color = Color.White) }
-                OutlinedButton(enabled = step.why.isNotBlank(), onClick = {
-                  if (!showWhy) whyAsked++
-                  showWhy = true
-                  say(step.why)
-                }) { Text("Why?", color = Color.White) }
+                OutlinedButton(enabled = step.why.isNotBlank(), onClick = { explainStep() }) { Text("Why?", color = Color.White) }
               }
               val last = stepIndex == shown.steps.lastIndex
               Button(
-                  onClick = {
-                    showWhy = false
-                    if (last) finishSteps() else stepIndex++
-                  },
+                  onClick = { nextStep() },
                   modifier = Modifier.fillMaxWidth(),
               ) {
                 Text(
@@ -275,24 +353,14 @@ internal fun LearnScreen(lesson: Lesson, client: GeminiClient, data: UstadData, 
                     else -> ButtonDefaults.outlinedButtonColors()
                   }
               OutlinedButton(
-                  onClick = {
-                    if (chosen == null) {
-                      chosen = oi
-                      if (oi == answerIndex) quizCorrect++
-                      say((if (oi == answerIndex) "Correct. " else "Not quite. ") + q.explain)
-                    }
-                  },
+                  onClick = { pickOption(oi) },
                   colors = colors,
                   modifier = Modifier.fillMaxWidth(),
               ) { Text(option, color = Color.White) }
             }
             if (chosen != null) {
               if (q.explain.isNotBlank()) Text("💡 ${q.explain}", color = Color(0xFFFBBF24))
-              Button(onClick = {
-                chosen = null
-                if (quizIndex < shown.quiz.lastIndex) { quizIndex++; say(shown.quiz[quizIndex].question) }
-                else phase = LearnPhase.DONE
-              }) { Text(if (quizIndex < shown.quiz.lastIndex) "Next question" else "See my result") }
+              Button(onClick = { nextQuestion() }) { Text(if (quizIndex < shown.quiz.lastIndex) "Next question" else "See my result") }
             }
           }
         }
@@ -300,7 +368,7 @@ internal fun LearnScreen(lesson: Lesson, client: GeminiClient, data: UstadData, 
       LearnPhase.DONE -> {
         val r = result
         if (r != null) PassportCard(r) else UstadBusy("Saving to your Skill Passport…")
-        Button(onClick = { voice.stop(); onExit() }, modifier = Modifier.fillMaxWidth()) { Text("Done") }
+        Button(onClick = { loop.stopAll(); onExit() }, modifier = Modifier.fillMaxWidth()) { Text("Done") }
       }
     }
     if (voiceNote.isNotBlank()) Text(voiceNote, color = Muted, fontSize = 12.sp)

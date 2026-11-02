@@ -36,7 +36,6 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -63,7 +62,8 @@ import com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.MachineKind
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.MachineRouter
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.PrivacyFilter
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.RepairStep
-import com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.UstadVoice
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.Heard
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.VoiceCommand
 import kotlinx.coroutines.launch
 
 internal val Bg = Color(0xFF070C18)
@@ -87,12 +87,14 @@ fun UstadScreen(photo: Bitmap, onDismiss: () -> Unit) {
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
   val client = remember { GeminiClient() }
-  val voice = remember { UstadVoice(context) }
+  // Voice loop: Ustad speaks (natural ElevenLabs voice or phone voice) and listens back.
+  val loop = rememberVoiceLoop()
+  val voice = loop.voice
+  var asked by remember { mutableStateOf<Pair<String, String>?>(null) }
   // Ustad's expert knowledge bases, one per machine kind it knows deeply (car, split AC).
   val kbs = remember {
     MachineKind.entries.mapNotNull { k -> k.kbFile?.let { f -> runCatching { k to KnowledgeBase.load(context, f) }.getOrNull() } }.toMap()
   }
-  DisposableEffect(Unit) { onDispose { voice.shutdown() } }
 
   var phase by remember { mutableStateOf<Phase>(Phase.Analyzing) }
   var safePhoto by remember { mutableStateOf(photo) }
@@ -110,7 +112,20 @@ fun UstadScreen(photo: Bitmap, onDismiss: () -> Unit) {
   var job by remember { mutableStateOf<com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.JobRecord?>(null) }
 
   fun say(text: String) {
-    voiceNote = if (voice.speak(text, language)) "" else "No ${language.promptName} voice installed on this phone"
+    loop.language = language
+    voiceNote = if (loop.say(text)) "" else "No ${language.promptName} voice installed on this phone"
+  }
+
+  loop.language = language
+  // Until a diagnosis is on screen, any question is about the photo / machine in general.
+  // (When the knowledge-base brain panel is showing, it owns the voice handler.)
+  val brainPanel = inspection?.let { !it.needBetterView && kbs[MachineRouter.detect(it)] != null } == true
+  if (!brainPanel) loop.onHeard = { heard ->
+    when (heard) {
+      is Heard.Question -> askUstad(scope, client, loop, heard.text, inspection?.let { "Machine: ${it.machine.type} ${it.machine.brand} ${it.machine.model}. ${it.voiceSummary}" }.orEmpty()) { asked = it }
+      is Heard.Command -> if (heard.command == VoiceCommand.STOP) loop.stopAll()
+      else -> Unit
+    }
   }
 
   // Privacy first, then diagnosis. Re-runs on Retry.
@@ -144,7 +159,7 @@ fun UstadScreen(photo: Bitmap, onDismiss: () -> Unit) {
       Spacer(Modifier.padding(6.dp))
       Text("See inside any machine", color = Muted, fontSize = 13.sp)
       Spacer(Modifier.weight(1f))
-      OutlinedButton(onClick = { voice.stop(); onDismiss() }) { Text("Close", color = Color.White) }
+      OutlinedButton(onClick = { loop.stopAll(); onDismiss() }) { Text("Close", color = Color.White) }
     }
 
     Image(
@@ -158,6 +173,8 @@ fun UstadScreen(photo: Bitmap, onDismiss: () -> Unit) {
         color = Ok,
         fontSize = 12.sp,
     )
+    VoiceBar(loop, hint = "Talk to Ustad: “why”, “yes”, “no”, “confirmed”, “next”, or ask a question.")
+    AskUstadCard(asked)
 
     when (val p = phase) {
       Phase.Analyzing -> UstadBusy("Ustad is looking and reasoning…")
@@ -177,7 +194,7 @@ fun UstadScreen(photo: Bitmap, onDismiss: () -> Unit) {
         val kind = MachineRouter.detect(insp)
         val kb = kbs[kind]
         if (kb != null) {
-          ExpertPanel(insp, kind, kb, client, language, onLanguage = { language = it }, say = ::say)
+          ExpertPanel(insp, kind, kb, client, language, onLanguage = { language = it }, say = ::say, loop = loop, onAsked = { asked = it })
           if (voiceNote.isNotBlank()) Text(voiceNote, color = Muted, fontSize = 12.sp)
           return@Column
         }
@@ -209,6 +226,33 @@ fun UstadScreen(photo: Bitmap, onDismiss: () -> Unit) {
         }
 
         if (dx != null) {
+          // Voice for the AI diagnosis path.
+          loop.onHeard = { heard ->
+            val coaching = phase == Phase.Coaching
+            when (heard) {
+              is Heard.Question ->
+                  askUstad(
+                      scope, client, loop, heard.text,
+                      "Machine: ${insp.machine.type} ${insp.machine.brand} ${insp.machine.model}. Suspected: ${dx.partName}. " +
+                          "Cause chain: ${dx.causeChain.joinToString(" -> ")}. Test: ${dx.confirmTest}. Safety: ${insp.safety.hazard}. " +
+                          (steps.getOrNull(stepIndex)?.let { "Current repair step: ${it.say}" } ?: "")) { asked = it }
+              is Heard.Command ->
+                  when (heard.command) {
+                    VoiceCommand.WHY -> say(dx.causeChain.joinToString(". "))
+                    VoiceCommand.REPEAT -> say(if (coaching) steps.getOrNull(stepIndex)?.say.orEmpty() else "${dx.partName}. ${dx.confirmTest}")
+                    VoiceCommand.NEXT -> if (coaching && stepIndex < steps.lastIndex) { stepIndex++; say(steps[stepIndex].say) }
+                    VoiceCommand.BACK -> if (coaching && stepIndex > 0) { stepIndex--; say(steps[stepIndex].say) }
+                    VoiceCommand.NOT_THIS ->
+                        if (!confirmed && dxIndex < insp.diagnoses.lastIndex) {
+                          dxIndex++
+                          insp.diagnoses.getOrNull(dxIndex)?.let { say("Next suspect: ${it.partName}. ${it.confirmTest}") }
+                        }
+                    VoiceCommand.STOP -> loop.stopAll()
+                    else -> Unit
+                  }
+              else -> Unit
+            }
+          }
           UstadCard("Inside view") {
             if (kind.hasExpertModel) {
               ExplodedView(listOfNotNull(MachineRouter.modelPart(kind, dx.partId, dx.partName)), page = kind.page)
