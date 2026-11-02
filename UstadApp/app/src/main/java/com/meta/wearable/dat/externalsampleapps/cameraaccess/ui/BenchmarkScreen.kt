@@ -99,7 +99,7 @@ internal fun BenchmarkScreen(onBack: () -> Unit) {
       UstadBody("1. Add photos of jobs where you KNOW the real cause.  2. Choose that cause for each.  3. Run. Ustad answers each photo like a real job.")
       Text("Aim for 30+ photos for a number you can trust. The brain's learning on this phone is switched off for the test, so the score is fair.", color = Muted, fontSize = 12.sp)
       Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Button(onClick = { picker.launch("image/*") }, enabled = !running) { Text("Add photos") }
+        Button(onClick = { picker.safeLaunch(context, "image/*") }, enabled = !running) { Text("Add photos") }
         if (photos.isNotEmpty()) OutlinedButton(onClick = { photos = emptyList(); result = null }, enabled = !running) { Text("Clear", color = Color.White) }
       }
     }

@@ -69,7 +69,7 @@ object PrivacyFilter {
         val boxes = faces + plates
         if (boxes.isEmpty()) return@withContext PrivacyResult(source, 0)
 
-        val out = source.copy(Bitmap.Config.ARGB_8888, true)
+        val out = source.copy(Bitmap.Config.ARGB_8888, true) ?: error("Couldn't copy the photo")
         val canvas = Canvas(out)
         boxes.forEach { r ->
           val box = Rect(r.left.coerceAtLeast(0), r.top.coerceAtLeast(0), r.right.coerceAtMost(out.width), r.bottom.coerceAtMost(out.height))
@@ -119,8 +119,11 @@ object PrivacyFilter {
     }
   }
 
-  /** Fallback: the platform detector (frontal faces only). */
-  private fun detectLegacy(source: Bitmap): List<Rect> {
+  /** Fallback: the platform detector (frontal faces only). Never throws. */
+  private fun detectLegacy(source: Bitmap): List<Rect> = runCatching { detectLegacyUnsafe(source) }.getOrDefault(emptyList())
+
+  private fun detectLegacyUnsafe(source: Bitmap): List<Rect> {
+    if (source.width < 2 || source.height < 2) return emptyList()
     // FaceDetector needs an RGB_565 bitmap with an even width.
     val evenWidth = source.width - (source.width % 2)
     val detectInput = Bitmap.createBitmap(source, 0, 0, evenWidth, source.height).copy(Bitmap.Config.RGB_565, false)

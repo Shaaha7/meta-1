@@ -410,8 +410,8 @@ fun ExpertPanel(
         stepIndex < 0 -> Button(onClick = {
           loadingSteps = true
           scope.launch {
-            steps = runCatching { client.translate(confirmed.fix, language.promptName) }.getOrDefault(confirmed.fix)
-            loadingSteps = false; stepIndex = 0; say(steps.first())
+            steps = runCatching { client.translate(confirmed.fix, language.promptName) }.getOrDefault(confirmed.fix).ifEmpty { confirmed.fix }
+            loadingSteps = false; stepIndex = 0; steps.firstOrNull()?.let { say(it) }
           }
         }) { Text("Start repair coach") }
         stepIndex < steps.size -> {

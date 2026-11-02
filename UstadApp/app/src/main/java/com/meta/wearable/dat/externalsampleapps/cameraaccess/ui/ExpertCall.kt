@@ -41,14 +41,14 @@ object ExpertContact {
     val n = waNumber(number(c))
     if (n.length < 8) return false
     val text = "Ustad: I need your eyes on this job. I'll video call you from my Meta glasses.\n\n$summary"
-    c.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/$n?text=${Uri.encode(text)}")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    safeStart(c, Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/$n?text=${Uri.encode(text)}")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     return true
   }
 
   fun dial(c: Context): Boolean {
     val n = number(c).filter { it.isDigit() || it == '+' }
     if (n.length < 6) return false
-    c.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:$n")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    safeStart(c, Intent(Intent.ACTION_DIAL, Uri.parse("tel:$n")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     return true
   }
 }

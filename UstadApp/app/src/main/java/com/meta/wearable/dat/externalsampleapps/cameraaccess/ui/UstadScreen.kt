@@ -152,7 +152,12 @@ private fun UstadScreenContent(photo: Bitmap, onDismiss: () -> Unit) {
   LaunchedEffect(attempt) {
     phase = Phase.Analyzing
     stage = "Blurring faces on the phone…"
-    val privacy = PrivacyFilter.blurFaces(photo)
+    // Privacy first: if the on-phone blur fails, nothing is sent (no un-blurred photo leaves the phone).
+    val privacy = runCatching { PrivacyFilter.blurFaces(photo) }.getOrNull()
+    if (privacy == null) {
+      phase = Phase.Failed("Couldn't run the privacy check on this photo, so nothing was sent. Take the photo again.")
+      return@LaunchedEffect
+    }
     stage = "Ustad is looking and reasoning…"
     safePhoto = privacy.image
     privacyNote = privacy.summary

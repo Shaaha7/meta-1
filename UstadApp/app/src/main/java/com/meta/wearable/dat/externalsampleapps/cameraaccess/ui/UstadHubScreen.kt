@@ -251,7 +251,7 @@ private fun HubHome(
       ActionTile(Icons.Default.Visibility, "Connect glasses", "Ray-Ban / Oakley Meta, or the Mock Device Kit for testing without glasses", Accent, onClick = onClose)
       SectionTitle("Find the fault")
       ActionTile(Icons.Default.PhotoCamera, "Take a photo", "Car, engine bay, AC or any machine → the failing part in 3D") { takePhoto() }
-      ActionTile(Icons.Default.PhotoLibrary, "From gallery", "Use a photo you already took", Accent) { pickPhoto.launch("image/*") }
+      ActionTile(Icons.Default.PhotoLibrary, "From gallery", "Use a photo you already took", Accent) { pickPhoto.safeLaunch(context, "image/*") }
       ActionTile(Icons.Default.BatteryChargingFull, "Battery check", "Lithium packs: health, life left, the weak layer, when to isolate", Ok, onClick = onBattery)
       SectionTitle("Prove it")
       ActionTile(Icons.Default.Insights, "Accuracy test", "Score Ustad on photos with a known cause, for your pitch", Warn, onClick = onBenchmark)
@@ -261,7 +261,7 @@ private fun HubHome(
     if (tab == HubTab.LEARN) {
       SectionTitle("Teach: an expert records a job")
       ActionTile(Icons.Default.Videocam, "Record an expert", "Glasses or head-mounted phone. Ustad drafts the lesson, the expert approves it") { recordVideo() }
-      ActionTile(Icons.Default.VideoLibrary, "Pick a video", "Turn an existing recording into a lesson", Accent) { pickVideo.launch("video/*") }
+      ActionTile(Icons.Default.VideoLibrary, "Pick a video", "Turn an existing recording into a lesson", Accent) { pickVideo.safeLaunch(context, "video/*") }
       SectionTitle("Learn")
     UstadCard("📚 Lessons") {
       if (lessons.isEmpty()) UstadBody("No lessons yet.")
@@ -331,7 +331,7 @@ private fun HubHome(
           shareFile(context, "ustad-records.json", "application/json",
               com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.Dashboard.exportRecords(data.passport, data.history))
         }) { Text("Share my records", color = Color.White) }
-        OutlinedButton(onClick = { recordsImporter.launch("*/*") }) { Text("Import team", color = Color.White) }
+        OutlinedButton(onClick = { recordsImporter.safeLaunch(context, "*/*") }) { Text("Import team", color = Color.White) }
       }
       Text("Technicians share their records; the supervisor imports them here. Nothing goes to a server.", color = Muted, fontSize = 12.sp)
     }
@@ -373,7 +373,7 @@ private fun HubHome(
         OutlinedButton(enabled = cases.isNotEmpty(), onClick = { shareFile(context, "ustad-knowledge.json", "application/json", data.cases.export()) }) {
           Text("Share knowledge", color = Color.White)
         }
-        OutlinedButton(onClick = { importer.launch("*/*") }) { Text("Import", color = Color.White) }
+        OutlinedButton(onClick = { importer.safeLaunch(context, "*/*") }) { Text("Import", color = Color.White) }
       }
       Text("Share knowledge sends what this phone learned to another technician; Import merges theirs.", color = Muted, fontSize = 12.sp)
     }
@@ -454,6 +454,24 @@ internal fun standaloneDashboard(context: Context, data: UstadData): String {
   return page.replaceFirst("<script>", "<script>window.USTAD_DATA = $json;</script>\n<script>")
 }
 
+/** Launches a picker / camera; a phone without a matching app gets a message instead of a crash. */
+internal fun <I> androidx.activity.compose.ManagedActivityResultLauncher<I, *>.safeLaunch(context: Context, input: I) {
+  try {
+    launch(input)
+  } catch (e: Exception) {
+    Toast.makeText(context, "No app on this phone can do that (${e.javaClass.simpleName})", Toast.LENGTH_LONG).show()
+  }
+}
+
+/** startActivity that never crashes (no app for the intent → a short message). */
+internal fun safeStart(context: Context, intent: android.content.Intent) {
+  try {
+    context.startActivity(intent)
+  } catch (e: Exception) {
+    Toast.makeText(context, "No app on this phone can open that", Toast.LENGTH_LONG).show()
+  }
+}
+
 /** Opens the system share sheet with plain text (job reports). */
 internal fun shareText(context: Context, subject: String, text: String) {
   val send =
@@ -462,7 +480,7 @@ internal fun shareText(context: Context, subject: String, text: String) {
         putExtra(android.content.Intent.EXTRA_SUBJECT, subject)
         putExtra(android.content.Intent.EXTRA_TEXT, text)
       }
-  context.startActivity(android.content.Intent.createChooser(send, subject).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+  safeStart(context, android.content.Intent.createChooser(send, subject).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
 }
 
 /** Shares a file from Ustad's cache folder (exported brain knowledge). */
@@ -476,7 +494,7 @@ internal fun shareFile(context: Context, name: String, mime: String, text: Strin
         putExtra(android.content.Intent.EXTRA_STREAM, uri)
         addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
       }
-  context.startActivity(android.content.Intent.createChooser(send, name).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+  safeStart(context, android.content.Intent.createChooser(send, name).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
 }
 
 /** Ustad's reasoning graph (assets/ustad/kb_graph.html), drawn from BrainGraph.reasoningGraph. */
@@ -559,7 +577,7 @@ internal fun rememberPhotoCapture(onPhoto: (Bitmap) -> Unit): () -> Unit {
         val uri = pending
         if (ok && uri != null) decodeBitmap(context, uri)?.let(onPhoto)
       }
-  val launch = { newCaptureUri(context, "jpg").also { pending = it }.let { take.launch(it) } }
+  val launch = { newCaptureUri(context, "jpg").also { pending = it }.let { take.safeLaunch(context, it) } }
   val permission =
       rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) launch() else Toast.makeText(context, "Camera permission is needed", Toast.LENGTH_SHORT).show()
@@ -580,7 +598,7 @@ internal fun rememberVideoCapture(onVideo: (Uri) -> Unit): () -> Unit {
         val uri = pending
         if (ok && uri != null) onVideo(uri)
       }
-  val launch = { newCaptureUri(context, "mp4").also { pending = it }.let { record.launch(it) } }
+  val launch = { newCaptureUri(context, "mp4").also { pending = it }.let { record.safeLaunch(context, it) } }
   val permission =
       rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) launch() else Toast.makeText(context, "Camera permission is needed", Toast.LENGTH_SHORT).show()

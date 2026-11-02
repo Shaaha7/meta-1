@@ -104,7 +104,7 @@ fun LessonStudioScreen(video: Uri, client: GeminiClient, onBack: () -> Unit, onD
             }
           }
           Text(
-              "🔒 ${com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.PrivacyResult(fs.frames.first().image, fs.facesBlurred, fs.platesBlurred).summary} · " +
+              "🔒 ${com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.PrivacyResult(fs.frames.firstOrNull()?.image ?: return@UstadCard, fs.facesBlurred, fs.platesBlurred).summary} · " +
                   "only these still frames are sent to the AI, never the video or its audio",
               color = Ok,
               fontSize = 12.sp,

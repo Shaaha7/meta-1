@@ -49,6 +49,11 @@ object UstadLens {
   @Synchronized
   fun attach(deviceSession: DeviceSession) {
     if (display != null && session === deviceSession) return
+    // Runs inside the glasses-session code: a failure here must never close the app.
+    runCatching { attachUnsafe(deviceSession) }.onFailure { Log.w(TAG, "Display not available", it) }
+  }
+
+  private fun attachUnsafe(deviceSession: DeviceSession) {
     deviceSession
         .addDisplay(DisplayConfiguration())
         .onSuccess { d ->
@@ -62,7 +67,9 @@ object UstadLens {
   }
 
   @Synchronized
-  fun detach() {
+  fun detach() = runCatching { detachUnsafe() }.let { Unit }
+
+  private fun detachUnsafe() {
     pending?.cancel()
     display?.let { runCatching { it.stop() }; runCatching { it.close() } }
     session?.let { runCatching { it.removeDisplay() } }

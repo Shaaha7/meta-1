@@ -108,9 +108,10 @@ object VideoFrames {
    * a single image per request (e.g. a local Llama vision model).
    */
   fun contactSheet(frames: List<KeyFrame>, cellWidth: Int = 384): Bitmap {
+    require(frames.isNotEmpty()) { "No frames were found in the video" }
     val cols = if (frames.size <= 4) 2 else 3
     val rows = (frames.size + cols - 1) / cols
-    val aspect = frames.first().image.let { it.height.toFloat() / it.width }
+    val aspect = frames.first().image.let { it.height.toFloat() / it.width.coerceAtLeast(1) }
     val cellHeight = (cellWidth * aspect).toInt()
     val sheet = Bitmap.createBitmap(cols * cellWidth, rows * cellHeight, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(sheet)
