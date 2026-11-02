@@ -99,6 +99,7 @@ private fun UstadScreenContent(photo: Bitmap, onDismiss: () -> Unit) {
   var asked by remember { mutableStateOf<Pair<String, String>?>(null) }
   // What 🎧 Listen heard (machines outside the knowledge bases).
   var heardReport by remember { mutableStateOf("") }
+  var details by remember { mutableStateOf(false) }
   // What the safety rules changed in the AI's repair steps.
   var safetyFindings by remember { mutableStateOf<List<String>>(emptyList()) }
   // Ustad's expert knowledge bases, one per machine kind it knows deeply (car, split AC).
@@ -247,11 +248,15 @@ private fun UstadScreenContent(photo: Bitmap, onDismiss: () -> Unit) {
               fontSize = 12.sp,
           )
         }
-        if (insp.symptoms.isNotEmpty()) {
-          UstadCard("What I see") { insp.symptoms.forEach { UstadBody("• ${it.symptom} — ${it.location}") } }
-        }
         val machineLine = listOf(insp.machine.type, insp.machine.brand, insp.machine.model).filter { it.isNotBlank() }.joinToString(" ")
-        ListenCard(machineLine, emptyList(), client, language, loop) { heardReport = it.heard }
+        // Short by default; what Ustad saw, the sound check and the full cause chain are one tap away.
+        DetailsToggle(details, "What Ustad sees, listen to the machine, full cause chain, call an expert") { details = it }
+        if (details) {
+          if (insp.symptoms.isNotEmpty()) {
+            UstadCard("What I see") { insp.symptoms.forEach { UstadBody("• ${it.symptom} — ${it.location}") } }
+          }
+          ListenCard(machineLine, emptyList(), client, language, loop) { heardReport = it.heard }
+        }
         if (insp.safety.hazard.isNotBlank() || insp.safety.stopAndCallPro) {
           UstadCard("⚠ Safety", border = Fault) {
             UstadBody(insp.safety.hazard)
@@ -297,7 +302,7 @@ private fun UstadScreenContent(photo: Bitmap, onDismiss: () -> Unit) {
               ExplodedView(listOf(dx.partId), partsJson = partsLayout(insp))
             }
           }
-          UstadCard("Why it's failing") {
+          if (details) UstadCard("Why it's failing") {
             dx.causeChain.forEachIndexed { i, step ->
               Text(step, color = Color.White, modifier = Modifier.fillMaxWidth().background(Color(0xFF11203D), RoundedCornerShape(6.dp)).padding(8.dp))
               if (i < dx.causeChain.lastIndex) Text("▼", color = Fault, modifier = Modifier.padding(start = 12.dp))
@@ -308,6 +313,7 @@ private fun UstadScreenContent(photo: Bitmap, onDismiss: () -> Unit) {
               Row { Text(d.partName, color = if (i == dxIndex) Color.White else Muted, modifier = Modifier.weight(1f)); Text("${(d.confidence * 100).toInt()}%", color = Color.White) }
               LinearProgressIndicator(progress = { d.confidence.toFloat() }, color = if (i == dxIndex) Fault else Hud, trackColor = Color(0xFF13213D), modifier = Modifier.fillMaxWidth())
             }
+            if (!details && dx.causeChain.isNotEmpty()) Text(dx.causeChain.joinToString("  →  "), color = Muted, fontSize = 13.sp)
             Spacer(Modifier.height(4.dp))
             UstadBody("🧪 Prove it: ${dx.confirmTest}")
             Text("If true: ${dx.expectedIfTrue}", color = Muted, fontSize = 13.sp)
@@ -349,7 +355,7 @@ private fun UstadScreenContent(photo: Bitmap, onDismiss: () -> Unit) {
               if (confirmed) "Fix: ${dx.partName}" else "${dx.partName} · ${(dx.confidence * 100).toInt()}%",
               if (phase == Phase.Coaching) steps.getOrNull(stepIndex)?.say.orEmpty() else "Prove it: ${dx.confirmTest}",
               machineLine)
-          ExpertCallCard("Machine: $machineLine\nSeen: ${insp.symptoms.joinToString { it.symptom }}\nSuspected: ${dx.partName}\nTest: ${dx.confirmTest}") { say(it) }
+          if (details) ExpertCallCard("Machine: $machineLine\nSeen: ${insp.symptoms.joinToString { it.symptom }}\nSuspected: ${dx.partName}\nTest: ${dx.confirmTest}") { say(it) }
 
           if (confirmed) {
             UstadCard("Repair coach") {

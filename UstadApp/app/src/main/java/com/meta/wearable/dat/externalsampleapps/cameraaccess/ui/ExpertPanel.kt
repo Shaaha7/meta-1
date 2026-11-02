@@ -221,49 +221,55 @@ fun ExpertPanel(
     if (insp.errorCode.isNotBlank()) Text("Error code read: ${insp.errorCode}", color = Color(0xFFFBBF24), fontSize = 13.sp)
   }
 
-  UstadCard("🧠 Ustad's brain") {
-    UstadBody(
-        "${kb.failures.size} failure modes · ${kb.symptoms.size} symptoms · ${kb.sourceCount} sources" +
-            if (brain.learnedCases == 0) " · no confirmed fixes yet"
-            else " · learned from ${brain.learnedCases} confirmed fix(es), ${brain.modelCases} on this model")
-    if (brain.modelHistory.isNotEmpty()) {
-      Text(
-          "This model before: " + brain.modelHistory.entries.joinToString(", ") { (id, n) ->
-            "${brain.failures.firstOrNull { it.id == id }?.name ?: id} ×$n"
-          },
-          color = Color(0xFFFBBF24),
-          fontSize = 13.sp,
-      )
-    }
-    pastVisits.take(3).forEach { v ->
-      Text(
-          "• ${java.text.DateFormat.getDateInstance(java.text.DateFormat.MEDIUM).format(java.util.Date(v.at))}: ${v.cause}" +
-              if (v.completed) " (fixed)" else "",
-          color = Muted,
-          fontSize = 12.sp,
-      )
-    }
-    OutlinedButton(onClick = { showGraph = !showGraph }) { Text(if (showGraph) "Hide reasoning graph" else "Show reasoning graph", color = Color.White) }
-    if (showGraph) {
-      BrainGraphView(brain.reasoningGraph(evidence, ruledOut, kind.parts, focusId = focus.id).toString())
-    }
-  }
+  // Short by default: the answer, the 3D part, what to do. The reasoning is one tap away.
+  var details by remember { mutableStateOf(false) }
+  DetailsToggle(details, "Evidence, brain & history, listen to the machine, why Ustad thinks so") { details = it }
 
-  UstadCard("Evidence") {
-    if (evidence.isEmpty()) UstadBody("Nothing conclusive seen yet. Answer the questions below.")
-    evidence.forEach { (id, present) ->
-      val s = kb.symptoms[id] ?: return@forEach
-      Text("${if (present) "✓" else "✗"} ${s.label}  ·  ${when (id) { in answeredByUser -> "you"; in heardByEar -> "ears"; else -> "camera" }}",
-          color = if (present) Color.White else Muted, fontSize = 14.sp)
+  if (details) {
+    UstadCard("🧠 Ustad's brain") {
+      UstadBody(
+          "${kb.failures.size} failure modes · ${kb.symptoms.size} symptoms · ${kb.sourceCount} sources" +
+              if (brain.learnedCases == 0) " · no confirmed fixes yet"
+              else " · learned from ${brain.learnedCases} confirmed fix(es), ${brain.modelCases} on this model")
+      if (brain.modelHistory.isNotEmpty()) {
+        Text(
+            "This model before: " + brain.modelHistory.entries.joinToString(", ") { (id, n) ->
+              "${brain.failures.firstOrNull { it.id == id }?.name ?: id} ×$n"
+            },
+            color = Color(0xFFFBBF24),
+            fontSize = 13.sp,
+        )
+      }
+      pastVisits.take(3).forEach { v ->
+        Text(
+            "• ${java.text.DateFormat.getDateInstance(java.text.DateFormat.MEDIUM).format(java.util.Date(v.at))}: ${v.cause}" +
+                if (v.completed) " (fixed)" else "",
+            color = Muted,
+            fontSize = 12.sp,
+        )
+      }
+      OutlinedButton(onClick = { showGraph = !showGraph }) { Text(if (showGraph) "Hide reasoning graph" else "Show reasoning graph", color = Color.White) }
+      if (showGraph) {
+        BrainGraphView(brain.reasoningGraph(evidence, ruledOut, kind.parts, focusId = focus.id).toString())
+      }
     }
-  }
 
-  if (confirmed == null) {
-    ListenCard(machineName, kb.symptoms.values, client, language, loop) { report ->
-      // What was heard goes into the evidence (answers the technician gave by hand win).
-      val fromEar = report.symptoms.filterKeys { it in kb.symptoms && it !in answeredByUser }
-      evidence = evidence + fromEar
-      heardByEar = heardByEar + fromEar.keys
+    UstadCard("Evidence") {
+      if (evidence.isEmpty()) UstadBody("Nothing conclusive seen yet. Answer the questions below.")
+      evidence.forEach { (id, present) ->
+        val s = kb.symptoms[id] ?: return@forEach
+        Text("${if (present) "✓" else "✗"} ${s.label}  ·  ${when (id) { in answeredByUser -> "you"; in heardByEar -> "ears"; else -> "camera" }}",
+            color = if (present) Color.White else Muted, fontSize = 14.sp)
+      }
+    }
+
+    if (confirmed == null) {
+      ListenCard(machineName, kb.symptoms.values, client, language, loop) { report ->
+        // What was heard goes into the evidence (answers the technician gave by hand win).
+        val fromEar = report.symptoms.filterKeys { it in kb.symptoms && it !in answeredByUser }
+        evidence = evidence + fromEar
+        heardByEar = heardByEar + fromEar.keys
+      }
     }
   }
 
@@ -274,33 +280,37 @@ fun ExpertPanel(
       Row { Text(r.failure.name, color = if (i == 0) Color.White else Muted, modifier = Modifier.weight(1f)); Text("${(r.probability * 100).toInt()}%", color = Color.White) }
       LinearProgressIndicator(progress = { r.probability.toFloat() }, color = if (i == 0) Fault else Hud, trackColor = Color(0xFF13213D), modifier = Modifier.fillMaxWidth())
     }
+    // The cause chain in one line; the full chain and sources are in the details.
+    if (!details && focus.causeChain.isNotEmpty()) Text(focus.causeChain.joinToString("  →  "), color = Muted, fontSize = 13.sp)
   }
 
-  val weights = remember(brain, evidence, ruledOut, focus.id) { brain.explain(focus.id, evidence, ruledOut) }
-  if (weights.isNotEmpty() && confirmed == null) {
-    UstadCard("Why Ustad ranks this first") {
-      weights.take(5).forEach { w ->
-        Row {
-          Text("${if (w.present) "✓" else "✗"} ${w.symptom.label}", color = Color.White, fontSize = 14.sp, modifier = Modifier.weight(1f))
-          Text(w.verdict, color = if (w.weight > 0.4) Ok else if (w.weight < -0.4) Fault else Muted, fontSize = 12.sp)
+  if (details) {
+    val weights = remember(brain, evidence, ruledOut, focus.id) { brain.explain(focus.id, evidence, ruledOut) }
+    if (weights.isNotEmpty() && confirmed == null) {
+      UstadCard("Why Ustad ranks this first") {
+        weights.take(5).forEach { w ->
+          Row {
+            Text("${if (w.present) "✓" else "✗"} ${w.symptom.label}", color = Color.White, fontSize = 14.sp, modifier = Modifier.weight(1f))
+            Text(w.verdict, color = if (w.weight > 0.4) Ok else if (w.weight < -0.4) Fault else Muted, fontSize = 12.sp)
+          }
         }
+        val seen = brain.modelHistory[focus.id] ?: 0
+        if (seen > 0) Text("+ confirmed $seen× before on this model", color = Color(0xFFFBBF24), fontSize = 13.sp)
       }
-      val seen = brain.modelHistory[focus.id] ?: 0
-      if (seen > 0) Text("+ confirmed $seen× before on this model", color = Color(0xFFFBBF24), fontSize = 13.sp)
     }
-  }
 
-  UstadCard("Why it's happening") {
-    focus.causeChain.forEachIndexed { i, step ->
-      Text(step, color = Color.White, modifier = Modifier.fillMaxWidth().background(Color(0xFF11203D), RoundedCornerShape(6.dp)).padding(8.dp))
-      if (i < focus.causeChain.lastIndex) Text("▼", color = Fault, modifier = Modifier.padding(start = 12.dp))
+    UstadCard("Why it's happening") {
+      focus.causeChain.forEachIndexed { i, step ->
+        Text(step, color = Color.White, modifier = Modifier.fillMaxWidth().background(Color(0xFF11203D), RoundedCornerShape(6.dp)).padding(8.dp))
+        if (i < focus.causeChain.lastIndex) Text("▼", color = Fault, modifier = Modifier.padding(start = 12.dp))
+      }
+      Text("Sources: " + focus.sources.joinToString(" · ") { it.name }, color = Muted, fontSize = 12.sp)
     }
-    Text("Sources: " + focus.sources.joinToString(" · ") { it.name }, color = Muted, fontSize = 12.sp)
   }
 
   if (focus.safety.isNotBlank()) UstadCard("⚠ Safety", border = Fault) { UstadBody(focus.safety) }
 
-  ExpertCallCard(expertSummary(), say)
+  if (details) ExpertCallCard(expertSummary(), say)
 
   LensMirror(
       if (confirmed != null) "Fix: ${focus.name}" else "${focus.name} · ${(top.probability * 100).toInt()}%",
@@ -325,7 +335,7 @@ fun ExpertPanel(
   if (confirmed == null) {
     // Quickest likely causes first (probability per minute of testing).
     val order = remember(brain, evidence, ruledOut) { brain.checkOrder(evidence, ruledOut) }
-    if (order.size > 1) {
+    if (details && order.size > 1) {
       UstadCard("Check in this order") {
         order.forEachIndexed { i, r ->
           Row(verticalAlignment = Alignment.CenterVertically) {

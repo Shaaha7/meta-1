@@ -142,6 +142,25 @@ internal fun ActionTile(icon: ImageVector, title: String, subtitle: String, acce
   }
 }
 
+/** "More details" switch: results stay short by default, everything else is one tap away. */
+@Composable
+internal fun DetailsToggle(open: Boolean, what: String, onToggle: (Boolean) -> Unit) {
+  Row(
+      Modifier.fillMaxWidth()
+          .clip(RoundedCornerShape(14.dp))
+          .background(Surface2)
+          .clickable { onToggle(!open) }
+          .padding(horizontal = 14.dp, vertical = 10.dp),
+      verticalAlignment = Alignment.CenterVertically,
+  ) {
+    Column(Modifier.weight(1f)) {
+      Text(if (open) "Hide details" else "More details", color = Hud, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+      if (!open) Text(what, color = Muted, fontSize = 12.sp)
+    }
+    Text(if (open) "▴" else "▾", color = Hud, fontSize = 18.sp)
+  }
+}
+
 /** Section title between groups of tiles. */
 @Composable
 internal fun SectionTitle(text: String) {
