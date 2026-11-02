@@ -34,7 +34,8 @@ object UstadLens {
 
   private data class Card(val title: String, val body: String, val meta: String, val image: Bitmap?)
 
-  private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+  private val scope =
+      CoroutineScope(SupervisorJob() + Dispatchers.Default + kotlinx.coroutines.CoroutineExceptionHandler { _, e -> Log.w(TAG, "Lens error", e) })
   private val _connected = MutableStateFlow(false)
   private var display: Display? = null
   private var session: DeviceSession? = null

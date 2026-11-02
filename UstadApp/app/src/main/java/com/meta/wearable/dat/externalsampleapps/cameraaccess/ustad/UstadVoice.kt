@@ -73,7 +73,9 @@ class UstadVoice(context: Context) {
   private val appContext = context.applicationContext
   private val elevenKey = BuildConfig.ELEVENLABS_API_KEY
   private val cacheDir = File(appContext.cacheDir, "ustad-voice").apply { mkdirs() }
-  private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+  // A failure while fetching or playing a line must never close the app.
+  private val scope =
+      CoroutineScope(SupervisorJob() + Dispatchers.Main + kotlinx.coroutines.CoroutineExceptionHandler { _, e -> Log.w(TAG, "Voice error", e) })
   private val main = Handler(Looper.getMainLooper())
   private var current: Job? = null
   private var player: MediaPlayer? = null

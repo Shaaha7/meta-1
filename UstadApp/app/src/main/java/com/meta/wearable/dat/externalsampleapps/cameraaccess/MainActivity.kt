@@ -119,6 +119,8 @@ class MainActivity : ComponentActivity() {
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
+    // Ustad: keep the reason if the app ever closes by itself (shown in the hub, shareable).
+    com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.CrashLog.install(this, BuildConfig.VERSION_NAME)
     maybeStartMockDeviceTestServer()
     enableEdgeToEdge()
     setContent {

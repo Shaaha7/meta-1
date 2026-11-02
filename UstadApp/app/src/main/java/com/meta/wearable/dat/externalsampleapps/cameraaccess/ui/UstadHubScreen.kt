@@ -202,7 +202,10 @@ private fun HubHome(
     Row(verticalAlignment = Alignment.CenterVertically) {
       Text("USTAD", color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold)
       Spacer(Modifier.padding(6.dp))
-      Text("See inside. Learn by doing.", color = Muted, fontSize = 13.sp)
+      Column {
+        Text("See inside. Learn by doing.", color = Muted, fontSize = 13.sp)
+        Text("v${com.meta.wearable.dat.externalsampleapps.cameraaccess.BuildConfig.VERSION_NAME}", color = Muted, fontSize = 11.sp)
+      }
       Spacer(Modifier.weight(1f))
       OutlinedButton(onClick = onClose) { Text("Close", color = Color.White) }
     }
@@ -212,6 +215,21 @@ private fun HubHome(
         color = Muted,
         fontSize = 13.sp,
     )
+
+    var crash by remember { mutableStateOf(com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.CrashLog.last(context)) }
+    crash?.let { report ->
+      UstadCard("⚠ Ustad closed last time", border = Fault) {
+        Text(report.lineSequence().drop(4).take(4).joinToString("\n"), color = Color.White, fontSize = 12.sp)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+          Button(onClick = { shareText(context, "Ustad crash report", report) }) { Text("Share crash report") }
+          OutlinedButton(onClick = {
+            com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.CrashLog.clear(context)
+            crash = null
+          }) { Text("Dismiss", color = Color.White) }
+        }
+        Text("Send this to the developer (WhatsApp / email): it says exactly what went wrong.", color = Muted, fontSize = 12.sp)
+      }
+    }
 
     UstadCard("🔍 Inspect a machine") {
       UstadBody("Photo of a car, engine bay or machine → defect, cause chain, and the hidden part in 3D.")
