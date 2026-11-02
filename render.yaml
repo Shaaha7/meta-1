@@ -1,0 +1,20 @@
+# One-click deploy of the Ustad backend on Render (render.com): New → Blueprint → pick this repo.
+# Render asks for the secret values below; nothing secret is stored in the repo.
+services:
+  - type: web
+    name: ustad-backend
+    runtime: node
+    rootDir: backend
+    plan: free
+    buildCommand: "true"
+    startCommand: node server.js
+    healthCheckPath: /health
+    envVars:
+      - key: USTAD_APP_TOKENS
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: ELEVENLABS_API_KEY
+        sync: false
+      - key: RATE_PER_MIN
+        value: "30"

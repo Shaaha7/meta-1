@@ -4,141 +4,634 @@
   "model3d": "car.html",
   "version": 1,
   "sources": {
-    "nhtsa_tires": { "name": "NHTSA: Tires (inspection & safety)", "url": "https://www.nhtsa.gov/equipment/tires" },
-    "nhtsa_recalls": { "name": "NHTSA: Recalls & complaints by make/model", "url": "https://www.nhtsa.gov/recalls" },
-    "afdc_ev": { "name": "US DOE AFDC: Maintenance & safety of electric vehicles", "url": "https://afdc.energy.gov/vehicles/electric-maintenance" },
-    "sae_obd": { "name": "SAE J2012: OBD-II diagnostic trouble code definitions", "url": "https://www.sae.org/standards/content/j2012_201612/" },
-    "owner_manual": { "name": "Vehicle owner's manual: warning lights & maintenance", "url": "" }
+    "nhtsa_tires": {
+      "name": "NHTSA: Tires (inspection & safety)",
+      "url": "https://www.nhtsa.gov/equipment/tires"
+    },
+    "nhtsa_recalls": {
+      "name": "NHTSA: Recalls & complaints by make/model",
+      "url": "https://www.nhtsa.gov/recalls"
+    },
+    "afdc_ev": {
+      "name": "US DOE AFDC: Maintenance & safety of electric vehicles",
+      "url": "https://afdc.energy.gov/vehicles/electric-maintenance"
+    },
+    "sae_obd": {
+      "name": "SAE J2012: OBD-II diagnostic trouble code definitions",
+      "url": "https://www.sae.org/standards/content/j2012_201612/"
+    },
+    "owner_manual": {
+      "name": "Vehicle owner's manual: warning lights & maintenance",
+      "url": ""
+    }
   },
   "symptoms": {
-    "car_body_damage":     { "label": "Crash damage to body or bumper", "question": "Is there crash damage to the body or bumper?", "visual": true },
-    "car_tire_flat":       { "label": "Tire looks flat or low", "question": "Does a tire look flat or low?", "visual": true },
-    "car_tire_worn":       { "label": "Tread worn or uneven", "question": "Is the tire tread worn down or uneven?", "visual": true },
-    "car_tire_bulge":      { "label": "Bulge or cut on tire sidewall", "question": "Is there a bulge or cut on a tire sidewall?", "visual": true },
-    "car_fluid_puddle":    { "label": "Fluid leak under the car", "question": "Is there a fluid puddle under the car?", "visual": true },
-    "car_green_fluid":     { "label": "Green, pink or orange fluid (coolant)", "question": "Is the leaking fluid green, pink or orange?", "visual": true },
-    "car_dark_fluid":      { "label": "Dark brown or black fluid (oil)", "question": "Is the leaking fluid dark brown or black?", "visual": true },
-    "car_smoke_white":     { "label": "White smoke or steam from hood/exhaust", "question": "Is there white smoke or steam?", "visual": true },
-    "car_smoke_blue":      { "label": "Blue or black exhaust smoke", "question": "Is the exhaust smoke blue or black?", "visual": true },
-    "car_terminal_corrosion": { "label": "White/green crust on 12V battery terminals", "question": "Is there white or green crust on the battery terminals?", "visual": true },
-    "car_check_engine":    { "label": "Check-engine warning light", "question": "Is the check-engine light on?", "visual": true },
-    "car_battery_light":   { "label": "Battery / charging warning light", "question": "Is the battery warning light on?", "visual": true },
-    "car_temp_light":      { "label": "High temperature warning or gauge in red", "question": "Is the temperature gauge high or its light on?", "visual": true },
-    "car_ev_warning":      { "label": "EV / high-voltage system warning", "question": "Is an EV or high-voltage system warning shown?", "visual": true },
-    "car_brake_light":     { "label": "Brake warning light", "question": "Is the brake warning light on?", "visual": true },
-    "car_rotor_scored":    { "label": "Brake disc grooved or rusty", "question": "Is the brake disc deeply grooved?", "visual": true },
-    "car_no_start":        { "label": "Car does not start / no power", "question": "Does the car fail to start?", "visual": false },
-    "car_slow_crank":      { "label": "Engine cranks slowly", "question": "Does the engine crank slowly when starting?", "visual": false },
-    "car_overheating":     { "label": "Overheating while driving", "question": "Does it overheat while driving?", "visual": false },
-    "car_brake_squeal":    { "label": "Squealing or grinding when braking", "question": "Is there squealing or grinding when braking?", "visual": false },
-    "car_pulls_side":      { "label": "Pulls to one side", "question": "Does the car pull to one side?", "visual": false },
-    "car_range_drop":      { "label": "EV range dropped a lot", "question": "Has the EV driving range dropped a lot?", "visual": false },
-    "car_rough_idle":      { "label": "Rough idle or shaking", "question": "Does the engine idle roughly or shake?", "visual": false },
-    "car_sweet_smell":     { "label": "Sweet smell (coolant)", "question": "Is there a sweet smell near the car?", "visual": false },
-    "car_burning_smell":   { "label": "Burning smell", "question": "Is there a burning smell?", "visual": false }
+    "car_body_damage": {
+      "label": "Crash damage to body or bumper",
+      "question": "Is there crash damage to the body or bumper?",
+      "visual": true
+    },
+    "car_tire_flat": {
+      "label": "Tire looks flat or low",
+      "question": "Does a tire look flat or low?",
+      "visual": true
+    },
+    "car_tire_worn": {
+      "label": "Tread worn or uneven",
+      "question": "Is the tire tread worn down or uneven?",
+      "visual": true
+    },
+    "car_tire_bulge": {
+      "label": "Bulge or cut on tire sidewall",
+      "question": "Is there a bulge or cut on a tire sidewall?",
+      "visual": true
+    },
+    "car_fluid_puddle": {
+      "label": "Fluid leak under the car",
+      "question": "Is there a fluid puddle under the car?",
+      "visual": true
+    },
+    "car_green_fluid": {
+      "label": "Green, pink or orange fluid (coolant)",
+      "question": "Is the leaking fluid green, pink or orange?",
+      "visual": true
+    },
+    "car_dark_fluid": {
+      "label": "Dark brown or black fluid (oil)",
+      "question": "Is the leaking fluid dark brown or black?",
+      "visual": true
+    },
+    "car_smoke_white": {
+      "label": "White smoke or steam from hood/exhaust",
+      "question": "Is there white smoke or steam?",
+      "visual": true
+    },
+    "car_smoke_blue": {
+      "label": "Blue or black exhaust smoke",
+      "question": "Is the exhaust smoke blue or black?",
+      "visual": true
+    },
+    "car_terminal_corrosion": {
+      "label": "White/green crust on 12V battery terminals",
+      "question": "Is there white or green crust on the battery terminals?",
+      "visual": true
+    },
+    "car_check_engine": {
+      "label": "Check-engine warning light",
+      "question": "Is the check-engine light on?",
+      "visual": true
+    },
+    "car_battery_light": {
+      "label": "Battery / charging warning light",
+      "question": "Is the battery warning light on?",
+      "visual": true
+    },
+    "car_temp_light": {
+      "label": "High temperature warning or gauge in red",
+      "question": "Is the temperature gauge high or its light on?",
+      "visual": true
+    },
+    "car_ev_warning": {
+      "label": "EV / high-voltage system warning",
+      "question": "Is an EV or high-voltage system warning shown?",
+      "visual": true
+    },
+    "car_brake_light": {
+      "label": "Brake warning light",
+      "question": "Is the brake warning light on?",
+      "visual": true
+    },
+    "car_rotor_scored": {
+      "label": "Brake disc grooved or rusty",
+      "question": "Is the brake disc deeply grooved?",
+      "visual": true
+    },
+    "car_no_start": {
+      "label": "Car does not start / no power",
+      "question": "Does the car fail to start?",
+      "visual": false
+    },
+    "car_slow_crank": {
+      "label": "Engine cranks slowly",
+      "question": "Does the engine crank slowly when starting?",
+      "visual": false
+    },
+    "car_overheating": {
+      "label": "Overheating while driving",
+      "question": "Does it overheat while driving?",
+      "visual": false
+    },
+    "car_brake_squeal": {
+      "label": "Squealing or grinding when braking",
+      "question": "Is there squealing or grinding when braking?",
+      "visual": false
+    },
+    "car_pulls_side": {
+      "label": "Pulls to one side",
+      "question": "Does the car pull to one side?",
+      "visual": false
+    },
+    "car_range_drop": {
+      "label": "EV range dropped a lot",
+      "question": "Has the EV driving range dropped a lot?",
+      "visual": false
+    },
+    "car_rough_idle": {
+      "label": "Rough idle or shaking",
+      "question": "Does the engine idle roughly or shake?",
+      "visual": false
+    },
+    "car_sweet_smell": {
+      "label": "Sweet smell (coolant)",
+      "question": "Is there a sweet smell near the car?",
+      "visual": false
+    },
+    "car_burning_smell": {
+      "label": "Burning smell",
+      "question": "Is there a burning smell?",
+      "visual": false
+    }
   },
   "failures": [
-    { "id": "collision_damage", "part": "c-bumper", "name": "Front-end collision damage", "prior": 0.06,
-      "symptoms": { "car_body_damage": 0.97, "car_fluid_puddle": 0.4, "car_green_fluid": 0.3, "car_temp_light": 0.2, "car_ev_warning": 0.15 },
-      "cause_chain": ["Impact crushes the bumper and crash structure", "Radiator, lights and sensors behind it can be damaged", "Leaks, warnings or unsafe structure follow"],
-      "test": "Look behind the bumper for a cracked radiator or fluid drips.", "expected": "Bent parts, cracked radiator or fresh fluid under the front.",
-      "fix": ["Do not drive if fluids leak or warnings show.", "Photograph the damage for insurance.", "STOP: structural and airbag-area repairs need a certified body shop."],
-      "safety": "For EVs and hybrids, crash damage can affect the high-voltage system. Keep clear and call the dealer.", "sources": ["nhtsa_recalls"] },
-    { "id": "tire_puncture", "part": "c-wheel-fl", "name": "Tire puncture / low pressure", "prior": 0.12,
-      "symptoms": { "car_tire_flat": 0.9, "car_pulls_side": 0.6 },
-      "cause_chain": ["A nail or valve leak lets air escape", "Tire pressure drops", "Car pulls and tire overheats"],
-      "test": "Check all four tire pressures with a gauge.", "expected": "One tire well below the door-sticker pressure.",
-      "fix": ["Park safely and turn on hazard lights.", "Inflate to the pressure on the door sticker.", "Spray soapy water to find the leak.", "Fit the spare or get the puncture repaired."],
-      "safety": "Never drive far on a flat tire.", "sources": ["nhtsa_tires"] },
-    { "id": "tire_worn", "part": "c-wheel-fl", "name": "Tire tread worn / uneven wear", "prior": 0.10,
-      "symptoms": { "car_tire_worn": 0.95, "car_pulls_side": 0.4 },
-      "cause_chain": ["Tires age or alignment is off", "Tread wears down or unevenly", "Grip drops, especially in rain"],
-      "test": "Insert a coin into the tread grooves.", "expected": "Tread below 1.6 mm or wear only on one edge.",
-      "fix": ["Replace tires with worn tread.", "Get a wheel alignment if wear is uneven.", "Rotate tires every 10,000 km."],
-      "safety": "", "sources": ["nhtsa_tires"] },
-    { "id": "tire_sidewall", "part": "c-wheel-fl", "name": "Tire sidewall bulge (internal damage)", "prior": 0.03,
-      "symptoms": { "car_tire_bulge": 0.95 },
-      "cause_chain": ["A pothole or kerb impact breaks internal cords", "Air pushes the sidewall out", "Tire can burst at speed"],
-      "test": "Look along the sidewall in good light.", "expected": "A visible bubble or cut.",
-      "fix": ["Do not drive at speed.", "Fit the spare.", "Replace the tire. Sidewall damage cannot be repaired."],
-      "safety": "High blow-out risk.", "sources": ["nhtsa_tires"] },
-    { "id": "battery12_weak", "part": "c-battery12", "name": "12V battery weak or failing", "prior": 0.12,
-      "symptoms": { "car_no_start": 0.8, "car_slow_crank": 0.85, "car_battery_light": 0.4, "car_terminal_corrosion": 0.4 },
-      "cause_chain": ["Heat ages the 12V battery (common in the UAE)", "It can't deliver starting current", "Slow crank or no start"],
-      "test": "Measure battery voltage with the engine off.", "expected": "Below 12.4 V at rest, or drops below 10 V while cranking.",
-      "fix": ["Turn everything off.", "Jump-start or use a booster pack.", "Test the battery at a service centre.", "Replace if it fails the load test."],
-      "safety": "Protect eyes; batteries can vent gas.", "sources": ["owner_manual"] },
-    { "id": "battery_terminals", "part": "c-battery12", "name": "Corroded or loose battery terminals", "prior": 0.06,
-      "symptoms": { "car_terminal_corrosion": 0.95, "car_no_start": 0.5, "car_slow_crank": 0.5 },
-      "cause_chain": ["Acid vapour forms crust on terminals", "Electrical contact gets poor", "Starter gets too little current"],
-      "test": "Wiggle each terminal clamp by hand (engine off).", "expected": "Crust visible or a clamp moves.",
-      "fix": ["Turn off the car and remove the key.", "Disconnect negative first, then positive.", "Clean with baking soda and water and a brush.", "Reconnect positive first, then negative, and tighten."],
-      "safety": "Wear gloves and eye protection.", "sources": ["owner_manual"] },
-    { "id": "alternator_fail", "part": "c-engine", "name": "Alternator not charging", "prior": 0.05,
-      "symptoms": { "car_battery_light": 0.9, "car_no_start": 0.4, "car_burning_smell": 0.2 },
-      "cause_chain": ["Alternator or its belt fails", "Battery is not recharged while driving", "Warning light, then the car dies"],
-      "test": "Measure battery voltage with the engine running.", "expected": "Below 13.5 V while running.",
-      "fix": ["Avoid long drives.", "Check the drive belt is intact.", "Have the alternator tested and replaced at a workshop."],
-      "safety": "", "sources": ["owner_manual"] },
-    { "id": "coolant_leak", "part": "c-radiator", "name": "Coolant leak (radiator or hose)", "prior": 0.08,
-      "symptoms": { "car_fluid_puddle": 0.85, "car_green_fluid": 0.85, "car_overheating": 0.6, "car_temp_light": 0.5, "car_sweet_smell": 0.6, "car_smoke_white": 0.3 },
-      "cause_chain": ["A radiator or hose cracks", "Coolant leaks out", "Engine runs hot and can overheat"],
-      "test": "With the engine COLD, check the coolant reservoir level.", "expected": "Level below MIN and drips under the radiator.",
-      "fix": ["Stop driving if the gauge is high.", "Let the engine cool fully.", "Top up with the correct coolant.", "Find and replace the leaking hose or radiator."],
-      "safety": "Never open the radiator cap when hot: scalding risk.", "sources": ["owner_manual"] },
-    { "id": "head_gasket", "part": "c-engine", "name": "Head gasket failure", "prior": 0.02,
-      "symptoms": { "car_smoke_white": 0.8, "car_overheating": 0.8, "car_temp_light": 0.6, "car_rough_idle": 0.5, "car_sweet_smell": 0.5 },
-      "cause_chain": ["Overheating warps the cylinder head", "Gasket fails and coolant enters cylinders", "White exhaust smoke and overheating"],
-      "test": "Check the oil cap for milky residue.", "expected": "Milky, light-brown sludge.",
-      "fix": ["Do not drive.", "STOP: needs workshop diagnosis (compression / block test)."],
-      "safety": "", "sources": ["owner_manual"] },
-    { "id": "oil_leak", "part": "c-engine", "name": "Engine oil leak", "prior": 0.07,
-      "symptoms": { "car_fluid_puddle": 0.85, "car_dark_fluid": 0.85, "car_burning_smell": 0.4, "car_smoke_blue": 0.2 },
-      "cause_chain": ["A gasket or seal hardens and leaks", "Oil drips onto hot parts or the ground", "Low oil and burning smell"],
-      "test": "Check the dipstick and look under the engine.", "expected": "Oil level low and wet, dark residue on the engine.",
-      "fix": ["Top up oil to the correct level.", "Clean the area and recheck after a short drive.", "Replace the leaking gasket or seal at a workshop."],
-      "safety": "Oil on hot exhaust is a fire risk.", "sources": ["owner_manual"] },
-    { "id": "oil_burning", "part": "c-engine", "name": "Engine burning oil (worn rings/valve seals)", "prior": 0.03,
-      "symptoms": { "car_smoke_blue": 0.9, "car_check_engine": 0.4, "car_rough_idle": 0.4 },
-      "cause_chain": ["Piston rings or valve seals wear", "Oil enters the combustion chamber", "Blue smoke and oil use"],
-      "test": "Check how much oil is used between changes.", "expected": "More than about 1 litre per 1,000 km.",
-      "fix": ["Monitor oil level weekly.", "STOP: engine internals need workshop repair."],
-      "safety": "", "sources": ["owner_manual"] },
-    { "id": "misfire", "part": "c-engine", "name": "Engine misfire (plugs/coils)", "prior": 0.05,
-      "symptoms": { "car_check_engine": 0.85, "car_rough_idle": 0.85 },
-      "cause_chain": ["A spark plug or ignition coil fails", "One cylinder stops firing", "Rough idle and check-engine light"],
-      "test": "Read the OBD-II code with a scanner.", "expected": "Codes P0300–P0308 (misfire).",
-      "fix": ["Read the code to find the cylinder.", "Swap that coil with a neighbour to confirm.", "Replace the faulty plug or coil."],
-      "safety": "A flashing check-engine light means stop soon: catalyst damage risk.", "sources": ["sae_obd"] },
-    { "id": "brake_pads_worn", "part": "c-brake", "name": "Brake pads worn", "prior": 0.10,
-      "symptoms": { "car_brake_squeal": 0.9, "car_brake_light": 0.4, "car_rotor_scored": 0.4 },
-      "cause_chain": ["Pad material wears down", "Wear indicator or metal touches the disc", "Squeal, then grinding and weaker braking"],
-      "test": "Look through the wheel at the pad thickness.", "expected": "Less than 3 mm of pad left.",
-      "fix": ["Avoid hard braking.", "Replace pads on both sides of the axle.", "Measure discs and replace if scored."],
-      "safety": "Brakes are safety-critical. Use a qualified mechanic.", "sources": ["owner_manual"] },
-    { "id": "brake_fluid_low", "part": "c-brake", "name": "Brake fluid low / brake system leak", "prior": 0.02,
-      "symptoms": { "car_brake_light": 0.9, "car_fluid_puddle": 0.4 },
-      "cause_chain": ["Fluid leaks or pads wear down", "Reservoir level falls", "Brake warning light and soft pedal"],
-      "test": "Check the brake fluid reservoir level.", "expected": "Below MIN.",
-      "fix": ["Do not drive if the pedal feels soft.", "STOP: brake leaks need a mechanic immediately."],
-      "safety": "Loss of braking risk.", "sources": ["owner_manual"] },
-    { "id": "alignment", "part": "c-suspension", "name": "Wheel alignment / suspension issue", "prior": 0.05,
-      "symptoms": { "car_pulls_side": 0.85, "car_tire_worn": 0.5 },
-      "cause_chain": ["A pothole or worn part shifts alignment", "Wheels point slightly off", "Car pulls and tires wear unevenly"],
-      "test": "Drive straight on a flat road and briefly relax your grip.", "expected": "The car drifts to one side.",
-      "fix": ["Check tire pressures first.", "Get a wheel alignment.", "Inspect suspension joints and bushings."],
-      "safety": "", "sources": ["nhtsa_tires"] },
-    { "id": "hv_battery_degraded", "part": "c-hvbattery", "name": "EV high-voltage battery degraded", "prior": 0.04,
-      "symptoms": { "car_range_drop": 0.9, "car_ev_warning": 0.4 },
-      "cause_chain": ["Heat and fast charging age the cells", "Capacity (state of health) falls", "Driving range drops"],
-      "test": "Read the battery state-of-health in the car app or with an OBD tool.", "expected": "State of health below about 80%.",
-      "fix": ["Avoid frequent 100% charges and fast charging in heat.", "Park in shade.", "Check battery warranty with the dealer."],
-      "safety": "Never open the high-voltage battery.", "sources": ["afdc_ev"] },
-    { "id": "hv_system_fault", "part": "c-hvbattery", "name": "EV high-voltage system fault", "prior": 0.02,
-      "symptoms": { "car_ev_warning": 0.95, "car_no_start": 0.5, "car_burning_smell": 0.2, "car_body_damage": 0.2 },
-      "cause_chain": ["A cell, contactor or cooling fault is detected", "The car limits power or shuts down", "EV warning shown"],
-      "test": "Note the exact warning message.", "expected": "A high-voltage / battery system warning.",
-      "fix": ["Stop safely and switch off.", "Keep everyone out of the car if there is smoke or smell.", "STOP: call the dealer's EV service. Do not touch orange cables."],
-      "safety": "High voltage: deadly. Only certified EV technicians.", "sources": ["afdc_ev"] }
-  ]
+    {
+      "id": "collision_damage",
+      "part": "c-bumper",
+      "name": "Front-end collision damage",
+      "prior": 0.06,
+      "symptoms": {
+        "car_body_damage": 0.97,
+        "car_fluid_puddle": 0.4,
+        "car_green_fluid": 0.3,
+        "car_temp_light": 0.2,
+        "car_ev_warning": 0.15
+      },
+      "cause_chain": [
+        "Impact crushes the bumper and crash structure",
+        "Radiator, lights and sensors behind it can be damaged",
+        "Leaks, warnings or unsafe structure follow"
+      ],
+      "test": "Look behind the bumper for a cracked radiator or fluid drips.",
+      "test_minutes": 3,
+      "expected": "Bent parts, cracked radiator or fresh fluid under the front.",
+      "fix": [
+        "Do not drive if fluids leak or warnings show.",
+        "Photograph the damage for insurance.",
+        "STOP: structural and airbag-area repairs need a certified body shop."
+      ],
+      "safety": "For EVs and hybrids, crash damage can affect the high-voltage system. Keep clear and call the dealer.",
+      "sources": [
+        "nhtsa_recalls"
+      ]
+    },
+    {
+      "id": "tire_puncture",
+      "part": "c-wheel-fl",
+      "name": "Tire puncture / low pressure",
+      "prior": 0.12,
+      "symptoms": {
+        "car_tire_flat": 0.9,
+        "car_pulls_side": 0.6
+      },
+      "cause_chain": [
+        "A nail or valve leak lets air escape",
+        "Tire pressure drops",
+        "Car pulls and tire overheats"
+      ],
+      "test": "Check all four tire pressures with a gauge.",
+      "test_minutes": 4,
+      "expected": "One tire well below the door-sticker pressure.",
+      "fix": [
+        "Park safely and turn on hazard lights.",
+        "Inflate to the pressure on the door sticker.",
+        "Spray soapy water to find the leak.",
+        "Fit the spare or get the puncture repaired."
+      ],
+      "safety": "Never drive far on a flat tire.",
+      "sources": [
+        "nhtsa_tires"
+      ]
+    },
+    {
+      "id": "tire_worn",
+      "part": "c-wheel-fl",
+      "name": "Tire tread worn / uneven wear",
+      "prior": 0.1,
+      "symptoms": {
+        "car_tire_worn": 0.95,
+        "car_pulls_side": 0.4
+      },
+      "cause_chain": [
+        "Tires age or alignment is off",
+        "Tread wears down or unevenly",
+        "Grip drops, especially in rain"
+      ],
+      "test": "Insert a coin into the tread grooves.",
+      "test_minutes": 1,
+      "expected": "Tread below 1.6 mm or wear only on one edge.",
+      "fix": [
+        "Replace tires with worn tread.",
+        "Get a wheel alignment if wear is uneven.",
+        "Rotate tires every 10,000 km."
+      ],
+      "safety": "",
+      "sources": [
+        "nhtsa_tires"
+      ]
+    },
+    {
+      "id": "tire_sidewall",
+      "part": "c-wheel-fl",
+      "name": "Tire sidewall bulge (internal damage)",
+      "prior": 0.03,
+      "symptoms": {
+        "car_tire_bulge": 0.95
+      },
+      "cause_chain": [
+        "A pothole or kerb impact breaks internal cords",
+        "Air pushes the sidewall out",
+        "Tire can burst at speed"
+      ],
+      "test": "Look along the sidewall in good light.",
+      "test_minutes": 2,
+      "expected": "A visible bubble or cut.",
+      "fix": [
+        "Do not drive at speed.",
+        "Fit the spare.",
+        "Replace the tire. Sidewall damage cannot be repaired."
+      ],
+      "safety": "High blow-out risk.",
+      "sources": [
+        "nhtsa_tires"
+      ]
+    },
+    {
+      "id": "battery12_weak",
+      "part": "c-battery12",
+      "name": "12V battery weak or failing",
+      "prior": 0.12,
+      "symptoms": {
+        "car_no_start": 0.8,
+        "car_slow_crank": 0.85,
+        "car_battery_light": 0.4,
+        "car_terminal_corrosion": 0.4
+      },
+      "cause_chain": [
+        "Heat ages the 12V battery (common in the UAE)",
+        "It can't deliver starting current",
+        "Slow crank or no start"
+      ],
+      "test": "Measure battery voltage with the engine off.",
+      "test_minutes": 2,
+      "expected": "Below 12.4 V at rest, or drops below 10 V while cranking.",
+      "fix": [
+        "Turn everything off.",
+        "Jump-start or use a booster pack.",
+        "Test the battery at a service centre.",
+        "Replace if it fails the load test."
+      ],
+      "safety": "Protect eyes; batteries can vent gas.",
+      "sources": [
+        "owner_manual"
+      ]
+    },
+    {
+      "id": "battery_terminals",
+      "part": "c-battery12",
+      "name": "Corroded or loose battery terminals",
+      "prior": 0.06,
+      "symptoms": {
+        "car_terminal_corrosion": 0.95,
+        "car_no_start": 0.5,
+        "car_slow_crank": 0.5
+      },
+      "cause_chain": [
+        "Acid vapour forms crust on terminals",
+        "Electrical contact gets poor",
+        "Starter gets too little current"
+      ],
+      "test": "Wiggle each terminal clamp by hand (engine off).",
+      "test_minutes": 1,
+      "expected": "Crust visible or a clamp moves.",
+      "fix": [
+        "Turn off the car and remove the key.",
+        "Disconnect negative first, then positive.",
+        "Clean with baking soda and water and a brush.",
+        "Reconnect positive first, then negative, and tighten."
+      ],
+      "safety": "Wear gloves and eye protection.",
+      "sources": [
+        "owner_manual"
+      ]
+    },
+    {
+      "id": "alternator_fail",
+      "part": "c-engine",
+      "name": "Alternator not charging",
+      "prior": 0.05,
+      "symptoms": {
+        "car_battery_light": 0.9,
+        "car_no_start": 0.4,
+        "car_burning_smell": 0.2
+      },
+      "cause_chain": [
+        "Alternator or its belt fails",
+        "Battery is not recharged while driving",
+        "Warning light, then the car dies"
+      ],
+      "test": "Measure battery voltage with the engine running.",
+      "test_minutes": 2,
+      "expected": "Below 13.5 V while running.",
+      "fix": [
+        "Avoid long drives.",
+        "Check the drive belt is intact.",
+        "Have the alternator tested and replaced at a workshop."
+      ],
+      "safety": "",
+      "sources": [
+        "owner_manual"
+      ]
+    },
+    {
+      "id": "coolant_leak",
+      "part": "c-radiator",
+      "name": "Coolant leak (radiator or hose)",
+      "prior": 0.08,
+      "symptoms": {
+        "car_fluid_puddle": 0.85,
+        "car_green_fluid": 0.85,
+        "car_overheating": 0.6,
+        "car_temp_light": 0.5,
+        "car_sweet_smell": 0.6,
+        "car_smoke_white": 0.3
+      },
+      "cause_chain": [
+        "A radiator or hose cracks",
+        "Coolant leaks out",
+        "Engine runs hot and can overheat"
+      ],
+      "test": "With the engine COLD, check the coolant reservoir level.",
+      "test_minutes": 2,
+      "expected": "Level below MIN and drips under the radiator.",
+      "fix": [
+        "Stop driving if the gauge is high.",
+        "Let the engine cool fully.",
+        "Top up with the correct coolant.",
+        "Find and replace the leaking hose or radiator."
+      ],
+      "safety": "Never open the radiator cap when hot: scalding risk.",
+      "sources": [
+        "owner_manual"
+      ]
+    },
+    {
+      "id": "head_gasket",
+      "part": "c-engine",
+      "name": "Head gasket failure",
+      "prior": 0.02,
+      "symptoms": {
+        "car_smoke_white": 0.8,
+        "car_overheating": 0.8,
+        "car_temp_light": 0.6,
+        "car_rough_idle": 0.5,
+        "car_sweet_smell": 0.5
+      },
+      "cause_chain": [
+        "Overheating warps the cylinder head",
+        "Gasket fails and coolant enters cylinders",
+        "White exhaust smoke and overheating"
+      ],
+      "test": "Check the oil cap for milky residue.",
+      "test_minutes": 1,
+      "expected": "Milky, light-brown sludge.",
+      "fix": [
+        "Do not drive.",
+        "STOP: needs workshop diagnosis (compression / block test)."
+      ],
+      "safety": "",
+      "sources": [
+        "owner_manual"
+      ]
+    },
+    {
+      "id": "oil_leak",
+      "part": "c-engine",
+      "name": "Engine oil leak",
+      "prior": 0.07,
+      "symptoms": {
+        "car_fluid_puddle": 0.85,
+        "car_dark_fluid": 0.85,
+        "car_burning_smell": 0.4,
+        "car_smoke_blue": 0.2
+      },
+      "cause_chain": [
+        "A gasket or seal hardens and leaks",
+        "Oil drips onto hot parts or the ground",
+        "Low oil and burning smell"
+      ],
+      "test": "Check the dipstick and look under the engine.",
+      "test_minutes": 3,
+      "expected": "Oil level low and wet, dark residue on the engine.",
+      "fix": [
+        "Top up oil to the correct level.",
+        "Clean the area and recheck after a short drive.",
+        "Replace the leaking gasket or seal at a workshop."
+      ],
+      "safety": "Oil on hot exhaust is a fire risk.",
+      "sources": [
+        "owner_manual"
+      ]
+    },
+    {
+      "id": "oil_burning",
+      "part": "c-engine",
+      "name": "Engine burning oil (worn rings/valve seals)",
+      "prior": 0.03,
+      "symptoms": {
+        "car_smoke_blue": 0.9,
+        "car_check_engine": 0.4,
+        "car_rough_idle": 0.4
+      },
+      "cause_chain": [
+        "Piston rings or valve seals wear",
+        "Oil enters the combustion chamber",
+        "Blue smoke and oil use"
+      ],
+      "test": "Check how much oil is used between changes.",
+      "test_minutes": 5,
+      "expected": "More than about 1 litre per 1,000 km.",
+      "fix": [
+        "Monitor oil level weekly.",
+        "STOP: engine internals need workshop repair."
+      ],
+      "safety": "",
+      "sources": [
+        "owner_manual"
+      ]
+    },
+    {
+      "id": "misfire",
+      "part": "c-engine",
+      "name": "Engine misfire (plugs/coils)",
+      "prior": 0.05,
+      "symptoms": {
+        "car_check_engine": 0.85,
+        "car_rough_idle": 0.85
+      },
+      "cause_chain": [
+        "A spark plug or ignition coil fails",
+        "One cylinder stops firing",
+        "Rough idle and check-engine light"
+      ],
+      "test": "Read the OBD-II code with a scanner.",
+      "test_minutes": 5,
+      "expected": "Codes P0300–P0308 (misfire).",
+      "fix": [
+        "Read the code to find the cylinder.",
+        "Swap that coil with a neighbour to confirm.",
+        "Replace the faulty plug or coil."
+      ],
+      "safety": "A flashing check-engine light means stop soon: catalyst damage risk.",
+      "sources": [
+        "sae_obd"
+      ]
+    },
+    {
+      "id": "brake_pads_worn",
+      "part": "c-brake",
+      "name": "Brake pads worn",
+      "prior": 0.1,
+      "symptoms": {
+        "car_brake_squeal": 0.9,
+        "car_brake_light": 0.4,
+        "car_rotor_scored": 0.4
+      },
+      "cause_chain": [
+        "Pad material wears down",
+        "Wear indicator or metal touches the disc",
+        "Squeal, then grinding and weaker braking"
+      ],
+      "test": "Look through the wheel at the pad thickness.",
+      "test_minutes": 2,
+      "expected": "Less than 3 mm of pad left.",
+      "fix": [
+        "Avoid hard braking.",
+        "Replace pads on both sides of the axle.",
+        "Measure discs and replace if scored."
+      ],
+      "safety": "Brakes are safety-critical. Use a qualified mechanic.",
+      "sources": [
+        "owner_manual"
+      ]
+    },
+    {
+      "id": "brake_fluid_low",
+      "part": "c-brake",
+      "name": "Brake fluid low / brake system leak",
+      "prior": 0.02,
+      "symptoms": {
+        "car_brake_light": 0.9,
+        "car_fluid_puddle": 0.4
+      },
+      "cause_chain": [
+        "Fluid leaks or pads wear down",
+        "Reservoir level falls",
+        "Brake warning light and soft pedal"
+      ],
+      "test": "Check the brake fluid reservoir level.",
+      "test_minutes": 1,
+      "expected": "Below MIN.",
+      "fix": [
+        "Do not drive if the pedal feels soft.",
+        "STOP: brake leaks need a mechanic immediately."
+      ],
+      "safety": "Loss of braking risk.",
+      "sources": [
+        "owner_manual"
+      ]
+    },
+    {
+      "id": "alignment",
+      "part": "c-suspension",
+      "name": "Wheel alignment / suspension issue",
+      "prior": 0.05,
+      "symptoms": {
+        "car_pulls_side": 0.85,
+        "car_tire_worn": 0.5
+      },
+      "cause_chain": [
+        "A pothole or worn part shifts alignment",
+        "Wheels point slightly off",
+        "Car pulls and tires wear unevenly"
+      ],
+      "test": "Drive straight on a flat road and briefly relax your grip.",
+      "test_minutes": 10,
+      "expected": "The car drifts to one side.",
+      "fix": [
+        "Check tire pressures first.",
+        "Get a wheel alignment.",
+        "Inspect suspension joints and bushings."
+      ],
+      "safety": "",
+      "sources": [
+        "nhtsa_tires"
+      ]
+    },
+    {
+      "id": "hv_battery_degraded",
+      "part": "c-hvbattery",
+      "name": "EV high-voltage battery degraded",
+      "prior": 0.04,
+      "symptoms": {
+        "car_range_drop": 0.9,
+        "car_ev_warning": 0.4
+      },
+      "cause_chain": [
+        "Heat and fast charging age the cells",
+        "Capacity (state of health) falls",
+        "Driving range drops"
+      ],
+      "test": "Read the battery state-of-health in the car app or with an OBD tool.",
+      "test_minutes": 5,
+      "expected": "State of health below about 80%.",
+      "fix": [
+        "Avoid frequent 100% charges and fast charging in heat.",
+        "Park in shade.",
+        "Check battery warranty with the dealer."
+      ],
+      "safety": "Never open the high-voltage battery.",
+      "sources": [
+        "afdc_ev"
+      ]
+    },
+    {
+      "id": "hv_system_fault",
+      "part": "c-hvbattery",
+      "name": "EV high-voltage system fault",
+      "prior": 0.02,
+      "symptoms": {
+        "car_ev_warning": 0.95,
+        "car_no_start": 0.5,
+        "car_burning_smell": 0.2,
+        "car_body_damage": 0.2
+      },
+      "cause_chain": [
+        "A cell, contactor or cooling fault is detected",
+        "The car limits power or shuts down",
+        "EV warning shown"
+      ],
+      "test": "Note the exact warning message.",
+      "test_minutes": 1,
+      "expected": "A high-voltage / battery system warning.",
+      "fix": [
+        "Stop safely and switch off.",
+        "Keep everyone out of the car if there is smoke or smell.",
+        "STOP: call the dealer's EV service. Do not touch orange cables."
+      ],
+      "safety": "High voltage: deadly. Only certified EV technicians.",
+      "sources": [
+        "afdc_ev"
+      ]
+    }
+  ],
+  "test_minutes_note": "Rough time for each test, estimated by the Ustad team (not from the sources); used to order checks."
 }

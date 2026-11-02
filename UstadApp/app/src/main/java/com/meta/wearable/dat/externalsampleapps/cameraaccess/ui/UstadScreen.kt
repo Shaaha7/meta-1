@@ -13,6 +13,8 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -67,8 +69,8 @@ import com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.Heard
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.VoiceCommand
 import kotlinx.coroutines.launch
 
-internal val Bg = Color(0xFF070C18)
-internal val CardBg = Color(0xFF0F1A30)
+internal val Bg = Color(0xFF060B16)
+internal val CardBg = Color(0xFF0E1729)
 internal val Hud = Color(0xFF39E6FF)
 internal val Fault = Color(0xFFFF3B30)
 internal val Ok = Color(0xFF34D399)
@@ -84,7 +86,10 @@ private sealed interface Phase {
 }
 
 @Composable
-fun UstadScreen(photo: Bitmap, onDismiss: () -> Unit) {
+fun UstadScreen(photo: Bitmap, onDismiss: () -> Unit) = UstadTheme { UstadScreenContent(photo, onDismiss) }
+
+@Composable
+private fun UstadScreenContent(photo: Bitmap, onDismiss: () -> Unit) {
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
   val client = remember { GeminiClient() }
@@ -548,12 +553,22 @@ internal fun LensMirror(title: String, body: String, meta: String = "Ustad") {
 }
 
 @Composable
-internal fun UstadCard(title: String, border: Color = Color(0xFF172A4D), content: @Composable () -> Unit) {
+internal fun UstadCard(title: String, border: Color = CardBorder, content: @Composable () -> Unit) {
+  val accent = when (border) { Fault -> Fault; Ok -> Ok; else -> Hud }
+  val edge = when (border) { CardBorder, Color(0xFF172A4D) -> CardBorder; else -> border.copy(alpha = 0.55f) }
   Column(
-      Modifier.fillMaxWidth().background(CardBg, RoundedCornerShape(12.dp)).padding(14.dp),
-      verticalArrangement = Arrangement.spacedBy(6.dp),
+      Modifier.fillMaxWidth()
+          .clip(RoundedCornerShape(18.dp))
+          .background(CardBg)
+          .border(1.dp, edge, RoundedCornerShape(18.dp))
+          .padding(16.dp),
+      verticalArrangement = Arrangement.spacedBy(8.dp),
   ) {
-    Text(title.uppercase(), color = if (border == Fault) Fault else Hud, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
+    Row(verticalAlignment = Alignment.CenterVertically) {
+      Box(Modifier.width(3.dp).height(14.dp).background(accent, RoundedCornerShape(2.dp)))
+      Spacer(Modifier.width(8.dp))
+      Text(title.uppercase(), color = accent, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
+    }
     content()
   }
 }

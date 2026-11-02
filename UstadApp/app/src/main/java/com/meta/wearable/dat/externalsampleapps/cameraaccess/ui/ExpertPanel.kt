@@ -11,6 +11,7 @@
 package com.meta.wearable.dat.externalsampleapps.cameraaccess.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
@@ -33,6 +34,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -321,6 +323,26 @@ fun ExpertPanel(
   }
 
   if (confirmed == null) {
+    // Quickest likely causes first (probability per minute of testing).
+    val order = remember(brain, evidence, ruledOut) { brain.checkOrder(evidence, ruledOut) }
+    if (order.size > 1) {
+      UstadCard("Check in this order") {
+        order.forEachIndexed { i, r ->
+          Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("${i + 1}", color = Hud, fontWeight = FontWeight.Black, fontSize = 18.sp, modifier = Modifier.padding(end = 10.dp))
+            Column(Modifier.weight(1f)) {
+              Text(r.failure.test, color = Color.White, fontSize = 14.sp)
+              Text("${r.failure.name} · ${(r.probability * 100).toInt()}% · ~${r.failure.testMinutes.toInt().coerceAtLeast(1)} min", color = Muted, fontSize = 12.sp)
+            }
+          }
+        }
+        Text(
+            "Ordered by likelihood per minute: about ${"%.0f".format(brain.expectedMinutes(order))} min expected to find it.",
+            color = Muted,
+            fontSize = 11.sp,
+        )
+      }
+    }
     UstadCard("Prove it") {
       UstadBody("🧪 ${top.failure.test}")
       Text("If it's this: ${top.failure.expected}", color = Muted, fontSize = 13.sp)

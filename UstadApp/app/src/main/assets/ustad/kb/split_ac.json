@@ -3,135 +3,505 @@
   "title": "Split air conditioner (indoor unit)",
   "version": 1,
   "sources": {
-    "lg_leak": { "name": "LG Support: Air conditioner indoor unit leaking", "url": "https://www.lg.com/ca_en/support/product-support/troubleshoot/help-library/cs-CT52006110-1433991512898/" },
-    "samsung_leak": { "name": "Samsung UAE: Fix water leakage in AC indoor unit", "url": "https://www.samsung.com/ae/support/home-appliances/how-to-fix-water-leakage-in-your-samsung-ac-indoor-unit/" },
-    "mrcool": { "name": "MRCOOL: Mini split troubleshooting & error codes", "url": "https://mrcooldiydirect.com/pages/mini-split-troubleshooting-error-codes" },
-    "trane": { "name": "Trane R-410A split system service manual", "url": "https://www.manualslib.com/manual/941084/Trane-R-410a-Split-System.html" }
+    "lg_leak": {
+      "name": "LG Support: Air conditioner indoor unit leaking",
+      "url": "https://www.lg.com/ca_en/support/product-support/troubleshoot/help-library/cs-CT52006110-1433991512898/"
+    },
+    "samsung_leak": {
+      "name": "Samsung UAE: Fix water leakage in AC indoor unit",
+      "url": "https://www.samsung.com/ae/support/home-appliances/how-to-fix-water-leakage-in-your-samsung-ac-indoor-unit/"
+    },
+    "mrcool": {
+      "name": "MRCOOL: Mini split troubleshooting & error codes",
+      "url": "https://mrcooldiydirect.com/pages/mini-split-troubleshooting-error-codes"
+    },
+    "trane": {
+      "name": "Trane R-410A split system service manual",
+      "url": "https://www.manualslib.com/manual/941084/Trane-R-410a-Split-System.html"
+    }
   },
   "symptoms": {
-    "water_drip":        { "label": "Water dripping from the indoor unit", "question": "Is water dripping from the indoor unit?", "visual": true },
-    "water_spray":       { "label": "Water droplets blowing out of the air outlet", "question": "Do water droplets blow out with the air?", "visual": true },
-    "ice_on_coil":       { "label": "Ice or frost on the coil or pipes", "question": "Is there ice or frost on the coil or pipes?", "visual": true },
-    "dirty_filter":      { "label": "Air filter visibly dusty or clogged", "question": "Is the air filter dusty or grey?", "visual": true },
-    "dirty_coil":        { "label": "Coil fins dirty, dusty or moldy", "question": "Are the coil fins dirty or black?", "visual": true },
-    "unit_tilted":       { "label": "Indoor unit not level", "question": "Does the indoor unit look tilted?", "visual": true },
-    "hose_kinked":       { "label": "Drain hose kinked, crushed or outlet blocked", "question": "Is the drain hose bent, crushed or its outlet blocked?", "visual": true },
-    "oily_residue":      { "label": "Oily stains at pipe joints", "question": "Are there oily stains on the pipe joints?", "visual": true },
-    "burn_mark":         { "label": "Burn marks or melted plastic", "question": "Do you see burn marks or a burning smell?", "visual": true },
-    "louver_stuck":      { "label": "Louver not moving", "question": "Is the louver (flap) stuck and not swinging?", "visual": true },
-    "display_error":     { "label": "Error code or blinking light on display", "question": "Is an error code or blinking light shown?", "visual": true },
-    "not_cooling":       { "label": "Room not cooling", "question": "Is the room not cooling properly?", "visual": false },
-    "weak_airflow":      { "label": "Weak airflow", "question": "Is the airflow weaker than normal?", "visual": false },
-    "noise_rattle":      { "label": "Rattling or vibration noise", "question": "Is there a rattling or vibrating noise?", "visual": false },
-    "noise_hiss":        { "label": "Hissing or bubbling noise", "question": "Do you hear hissing or bubbling?", "visual": false },
-    "bad_smell":         { "label": "Musty or bad smell", "question": "Is there a musty or bad smell?", "visual": false },
-    "no_power":          { "label": "Unit does not turn on", "question": "Does the unit fail to turn on?", "visual": false },
-    "outdoor_not_running": { "label": "Outdoor unit not running", "question": "Is the outdoor unit silent while cooling is on?", "visual": false }
+    "water_drip": {
+      "label": "Water dripping from the indoor unit",
+      "question": "Is water dripping from the indoor unit?",
+      "visual": true
+    },
+    "water_spray": {
+      "label": "Water droplets blowing out of the air outlet",
+      "question": "Do water droplets blow out with the air?",
+      "visual": true
+    },
+    "ice_on_coil": {
+      "label": "Ice or frost on the coil or pipes",
+      "question": "Is there ice or frost on the coil or pipes?",
+      "visual": true
+    },
+    "dirty_filter": {
+      "label": "Air filter visibly dusty or clogged",
+      "question": "Is the air filter dusty or grey?",
+      "visual": true
+    },
+    "dirty_coil": {
+      "label": "Coil fins dirty, dusty or moldy",
+      "question": "Are the coil fins dirty or black?",
+      "visual": true
+    },
+    "unit_tilted": {
+      "label": "Indoor unit not level",
+      "question": "Does the indoor unit look tilted?",
+      "visual": true
+    },
+    "hose_kinked": {
+      "label": "Drain hose kinked, crushed or outlet blocked",
+      "question": "Is the drain hose bent, crushed or its outlet blocked?",
+      "visual": true
+    },
+    "oily_residue": {
+      "label": "Oily stains at pipe joints",
+      "question": "Are there oily stains on the pipe joints?",
+      "visual": true
+    },
+    "burn_mark": {
+      "label": "Burn marks or melted plastic",
+      "question": "Do you see burn marks or a burning smell?",
+      "visual": true
+    },
+    "louver_stuck": {
+      "label": "Louver not moving",
+      "question": "Is the louver (flap) stuck and not swinging?",
+      "visual": true
+    },
+    "display_error": {
+      "label": "Error code or blinking light on display",
+      "question": "Is an error code or blinking light shown?",
+      "visual": true
+    },
+    "not_cooling": {
+      "label": "Room not cooling",
+      "question": "Is the room not cooling properly?",
+      "visual": false
+    },
+    "weak_airflow": {
+      "label": "Weak airflow",
+      "question": "Is the airflow weaker than normal?",
+      "visual": false
+    },
+    "noise_rattle": {
+      "label": "Rattling or vibration noise",
+      "question": "Is there a rattling or vibrating noise?",
+      "visual": false
+    },
+    "noise_hiss": {
+      "label": "Hissing or bubbling noise",
+      "question": "Do you hear hissing or bubbling?",
+      "visual": false
+    },
+    "bad_smell": {
+      "label": "Musty or bad smell",
+      "question": "Is there a musty or bad smell?",
+      "visual": false
+    },
+    "no_power": {
+      "label": "Unit does not turn on",
+      "question": "Does the unit fail to turn on?",
+      "visual": false
+    },
+    "outdoor_not_running": {
+      "label": "Outdoor unit not running",
+      "question": "Is the outdoor unit silent while cooling is on?",
+      "visual": false
+    }
   },
   "failures": [
     {
-      "id": "drain_line_clogged", "part": "p-pipe", "name": "Drain line clogged", "prior": 0.20,
-      "symptoms": { "water_drip": 0.95, "water_spray": 0.3, "bad_smell": 0.4 },
-      "cause_chain": ["Dust and algae build up inside the drain line", "Condensate water cannot flow out", "Drain pan overflows", "Water drips from the indoor unit"],
-      "test": "Pour a cup of water into the drain pan.", "expected": "Water does not drain away within 10 seconds.",
-      "fix": ["Switch off the AC at the isolator.", "Place a towel under the indoor unit.", "Disconnect the drain hose at the outlet.", "Flush the drain line with a wet-vac or water pump.", "Pour water in the pan and check it drains freely.", "Reconnect the hose, power on and watch for drips."],
-      "safety": "", "sources": ["lg_leak", "samsung_leak"]
+      "id": "drain_line_clogged",
+      "part": "p-pipe",
+      "name": "Drain line clogged",
+      "prior": 0.2,
+      "symptoms": {
+        "water_drip": 0.95,
+        "water_spray": 0.3,
+        "bad_smell": 0.4
+      },
+      "cause_chain": [
+        "Dust and algae build up inside the drain line",
+        "Condensate water cannot flow out",
+        "Drain pan overflows",
+        "Water drips from the indoor unit"
+      ],
+      "test": "Pour a cup of water into the drain pan.",
+      "test_minutes": 1,
+      "expected": "Water does not drain away within 10 seconds.",
+      "fix": [
+        "Switch off the AC at the isolator.",
+        "Place a towel under the indoor unit.",
+        "Disconnect the drain hose at the outlet.",
+        "Flush the drain line with a wet-vac or water pump.",
+        "Pour water in the pan and check it drains freely.",
+        "Reconnect the hose, power on and watch for drips."
+      ],
+      "safety": "",
+      "sources": [
+        "lg_leak",
+        "samsung_leak"
+      ]
     },
     {
-      "id": "drain_pan_dirty", "part": "p-pan", "name": "Drain pan dirty or blocked with algae", "prior": 0.08,
-      "symptoms": { "water_drip": 0.9, "bad_smell": 0.6, "dirty_coil": 0.4 },
-      "cause_chain": ["Slime and algae grow in the drain pan", "Pan outlet is blocked", "Water overflows the pan edge", "Water drips from the unit"],
-      "test": "Remove the front cover and look into the drain pan.", "expected": "Standing water or slime in the pan.",
-      "fix": ["Switch off the AC at the isolator.", "Remove the front cover and filter.", "Soak up standing water from the pan.", "Clean the pan with mild detergent and a soft brush.", "Clear the pan outlet, refit the cover and test."],
-      "safety": "", "sources": ["samsung_leak"]
+      "id": "drain_pan_dirty",
+      "part": "p-pan",
+      "name": "Drain pan dirty or blocked with algae",
+      "prior": 0.08,
+      "symptoms": {
+        "water_drip": 0.9,
+        "bad_smell": 0.6,
+        "dirty_coil": 0.4
+      },
+      "cause_chain": [
+        "Slime and algae grow in the drain pan",
+        "Pan outlet is blocked",
+        "Water overflows the pan edge",
+        "Water drips from the unit"
+      ],
+      "test": "Remove the front cover and look into the drain pan.",
+      "test_minutes": 3,
+      "expected": "Standing water or slime in the pan.",
+      "fix": [
+        "Switch off the AC at the isolator.",
+        "Remove the front cover and filter.",
+        "Soak up standing water from the pan.",
+        "Clean the pan with mild detergent and a soft brush.",
+        "Clear the pan outlet, refit the cover and test."
+      ],
+      "safety": "",
+      "sources": [
+        "samsung_leak"
+      ]
     },
     {
-      "id": "drain_hose_kinked", "part": "p-pipe", "name": "Drain hose kinked or outlet blocked", "prior": 0.05,
-      "symptoms": { "water_drip": 0.85, "hose_kinked": 0.9 },
-      "cause_chain": ["Drain hose is bent, crushed or its end is under water", "Water cannot drain", "Pan overflows", "Water drips from the unit"],
-      "test": "Follow the drain hose to its outlet.", "expected": "A bend, crush, upward slope or blocked end.",
-      "fix": ["Switch off the AC.", "Straighten the hose so it slopes continuously downward.", "Clear the hose end so it is not under water or blocked.", "Power on and check water flows out."],
-      "safety": "", "sources": ["lg_leak", "samsung_leak"]
+      "id": "drain_hose_kinked",
+      "part": "p-pipe",
+      "name": "Drain hose kinked or outlet blocked",
+      "prior": 0.05,
+      "symptoms": {
+        "water_drip": 0.85,
+        "hose_kinked": 0.9
+      },
+      "cause_chain": [
+        "Drain hose is bent, crushed or its end is under water",
+        "Water cannot drain",
+        "Pan overflows",
+        "Water drips from the unit"
+      ],
+      "test": "Follow the drain hose to its outlet.",
+      "test_minutes": 2,
+      "expected": "A bend, crush, upward slope or blocked end.",
+      "fix": [
+        "Switch off the AC.",
+        "Straighten the hose so it slopes continuously downward.",
+        "Clear the hose end so it is not under water or blocked.",
+        "Power on and check water flows out."
+      ],
+      "safety": "",
+      "sources": [
+        "lg_leak",
+        "samsung_leak"
+      ]
     },
     {
-      "id": "unit_not_level", "part": "p-pan", "name": "Indoor unit not installed level", "prior": 0.05,
-      "symptoms": { "water_drip": 0.8, "unit_tilted": 0.9 },
-      "cause_chain": ["Indoor unit tilts away from the drain side", "Water collects at the wrong end of the pan", "It spills over the pan edge", "Water drips from the unit"],
-      "test": "Put a spirit level (or phone level app) on top of the unit.", "expected": "The unit tilts away from the drain outlet side.",
-      "fix": ["Switch off the AC.", "Loosen the mounting plate screws.", "Re-level the unit with a slight tilt toward the drain side.", "Tighten the screws and test with water in the pan."],
-      "safety": "Work at height: use a stable ladder.", "sources": ["lg_leak", "samsung_leak"]
+      "id": "unit_not_level",
+      "part": "p-pan",
+      "name": "Indoor unit not installed level",
+      "prior": 0.05,
+      "symptoms": {
+        "water_drip": 0.8,
+        "unit_tilted": 0.9
+      },
+      "cause_chain": [
+        "Indoor unit tilts away from the drain side",
+        "Water collects at the wrong end of the pan",
+        "It spills over the pan edge",
+        "Water drips from the unit"
+      ],
+      "test": "Put a spirit level (or phone level app) on top of the unit.",
+      "test_minutes": 1,
+      "expected": "The unit tilts away from the drain outlet side.",
+      "fix": [
+        "Switch off the AC.",
+        "Loosen the mounting plate screws.",
+        "Re-level the unit with a slight tilt toward the drain side.",
+        "Tighten the screws and test with water in the pan."
+      ],
+      "safety": "Work at height: use a stable ladder.",
+      "sources": [
+        "lg_leak",
+        "samsung_leak"
+      ]
     },
     {
-      "id": "filter_clogged", "part": "p-filter", "name": "Air filter clogged", "prior": 0.22,
-      "symptoms": { "dirty_filter": 0.95, "weak_airflow": 0.85, "not_cooling": 0.6, "ice_on_coil": 0.45, "water_drip": 0.35, "bad_smell": 0.3 },
-      "cause_chain": ["Dust blocks the air filter", "Airflow across the coil drops", "Coil gets too cold and can freeze", "Weak, poor cooling (and melt water may drip)"],
-      "test": "Open the front cover and hold the filter up to a light.", "expected": "You can barely see light through the filter.",
-      "fix": ["Switch off the AC.", "Open the front cover and slide out the filters.", "Vacuum or rinse the filters with lukewarm water.", "Let them dry completely in the shade.", "Refit the filters and power on."],
-      "safety": "", "sources": ["mrcool", "lg_leak"]
+      "id": "filter_clogged",
+      "part": "p-filter",
+      "name": "Air filter clogged",
+      "prior": 0.22,
+      "symptoms": {
+        "dirty_filter": 0.95,
+        "weak_airflow": 0.85,
+        "not_cooling": 0.6,
+        "ice_on_coil": 0.45,
+        "water_drip": 0.35,
+        "bad_smell": 0.3
+      },
+      "cause_chain": [
+        "Dust blocks the air filter",
+        "Airflow across the coil drops",
+        "Coil gets too cold and can freeze",
+        "Weak, poor cooling (and melt water may drip)"
+      ],
+      "test": "Open the front cover and hold the filter up to a light.",
+      "test_minutes": 2,
+      "expected": "You can barely see light through the filter.",
+      "fix": [
+        "Switch off the AC.",
+        "Open the front cover and slide out the filters.",
+        "Vacuum or rinse the filters with lukewarm water.",
+        "Let them dry completely in the shade.",
+        "Refit the filters and power on."
+      ],
+      "safety": "",
+      "sources": [
+        "mrcool",
+        "lg_leak"
+      ]
     },
     {
-      "id": "coil_dirty", "part": "p-coil", "name": "Evaporator coil dirty", "prior": 0.10,
-      "symptoms": { "dirty_coil": 0.9, "weak_airflow": 0.6, "not_cooling": 0.6, "bad_smell": 0.5, "ice_on_coil": 0.3, "water_drip": 0.3 },
-      "cause_chain": ["Dust and mold coat the coil fins", "Heat transfer and airflow drop", "Coil may frost and smell", "Poor cooling"],
-      "test": "With the cover open, shine a torch on the coil fins.", "expected": "Fins are grey, black or matted with dust.",
-      "fix": ["Switch off the AC at the isolator.", "Cover the PCB area with plastic.", "Spray no-rinse coil cleaner on the fins.", "Gently comb bent fins straight.", "Let it dry 15 minutes, then power on."],
-      "safety": "Keep water and cleaner away from the control board.", "sources": ["mrcool"]
+      "id": "coil_dirty",
+      "part": "p-coil",
+      "name": "Evaporator coil dirty",
+      "prior": 0.1,
+      "symptoms": {
+        "dirty_coil": 0.9,
+        "weak_airflow": 0.6,
+        "not_cooling": 0.6,
+        "bad_smell": 0.5,
+        "ice_on_coil": 0.3,
+        "water_drip": 0.3
+      },
+      "cause_chain": [
+        "Dust and mold coat the coil fins",
+        "Heat transfer and airflow drop",
+        "Coil may frost and smell",
+        "Poor cooling"
+      ],
+      "test": "With the cover open, shine a torch on the coil fins.",
+      "test_minutes": 3,
+      "expected": "Fins are grey, black or matted with dust.",
+      "fix": [
+        "Switch off the AC at the isolator.",
+        "Cover the PCB area with plastic.",
+        "Spray no-rinse coil cleaner on the fins.",
+        "Gently comb bent fins straight.",
+        "Let it dry 15 minutes, then power on."
+      ],
+      "safety": "Keep water and cleaner away from the control board.",
+      "sources": [
+        "mrcool"
+      ]
     },
     {
-      "id": "refrigerant_low", "part": "p-coil", "name": "Low refrigerant (leak)", "prior": 0.08,
-      "symptoms": { "not_cooling": 0.9, "ice_on_coil": 0.6, "noise_hiss": 0.4, "oily_residue": 0.5, "water_drip": 0.3 },
-      "cause_chain": ["Refrigerant leaks from a joint or coil", "Pressure in the coil drops", "Coil freezes and cooling capacity falls", "Room does not cool"],
-      "test": "Look for oily stains on pipe joints and listen for hissing.", "expected": "Oily residue at a joint or a hissing sound.",
-      "fix": ["Switch off the AC.", "STOP: refrigerant work needs a certified technician with gauges and leak detector."],
-      "safety": "Refrigerant handling requires certification. Do not open the refrigerant circuit.", "sources": ["mrcool", "trane"]
+      "id": "refrigerant_low",
+      "part": "p-coil",
+      "name": "Low refrigerant (leak)",
+      "prior": 0.08,
+      "symptoms": {
+        "not_cooling": 0.9,
+        "ice_on_coil": 0.6,
+        "noise_hiss": 0.4,
+        "oily_residue": 0.5,
+        "water_drip": 0.3
+      },
+      "cause_chain": [
+        "Refrigerant leaks from a joint or coil",
+        "Pressure in the coil drops",
+        "Coil freezes and cooling capacity falls",
+        "Room does not cool"
+      ],
+      "test": "Look for oily stains on pipe joints and listen for hissing.",
+      "test_minutes": 3,
+      "expected": "Oily residue at a joint or a hissing sound.",
+      "fix": [
+        "Switch off the AC.",
+        "STOP: refrigerant work needs a certified technician with gauges and leak detector."
+      ],
+      "safety": "Refrigerant handling requires certification. Do not open the refrigerant circuit.",
+      "sources": [
+        "mrcool",
+        "trane"
+      ]
     },
     {
-      "id": "fan_motor_failing", "part": "p-fan", "name": "Blower fan motor failing", "prior": 0.05,
-      "symptoms": { "weak_airflow": 0.9, "not_cooling": 0.6, "noise_rattle": 0.3, "ice_on_coil": 0.3 },
-      "cause_chain": ["Fan motor bearings or windings wear out", "Fan spins slowly or stops", "Little air passes the coil", "Weak airflow and poor cooling"],
-      "test": "Set the fan to high and look at the blower through the outlet.", "expected": "Blower turns slowly, stops, or hums without turning.",
-      "fix": ["Switch off the AC at the isolator.", "STOP: motor replacement needs a qualified technician and the correct part number."],
-      "safety": "Electrical part: isolate power before touching.", "sources": ["mrcool"]
+      "id": "fan_motor_failing",
+      "part": "p-fan",
+      "name": "Blower fan motor failing",
+      "prior": 0.05,
+      "symptoms": {
+        "weak_airflow": 0.9,
+        "not_cooling": 0.6,
+        "noise_rattle": 0.3,
+        "ice_on_coil": 0.3
+      },
+      "cause_chain": [
+        "Fan motor bearings or windings wear out",
+        "Fan spins slowly or stops",
+        "Little air passes the coil",
+        "Weak airflow and poor cooling"
+      ],
+      "test": "Set the fan to high and look at the blower through the outlet.",
+      "test_minutes": 1,
+      "expected": "Blower turns slowly, stops, or hums without turning.",
+      "fix": [
+        "Switch off the AC at the isolator.",
+        "STOP: motor replacement needs a qualified technician and the correct part number."
+      ],
+      "safety": "Electrical part: isolate power before touching.",
+      "sources": [
+        "mrcool"
+      ]
     },
     {
-      "id": "fan_obstructed", "part": "p-fan", "name": "Blower fan obstructed or touching housing", "prior": 0.04,
-      "symptoms": { "noise_rattle": 0.85, "weak_airflow": 0.3 },
-      "cause_chain": ["Debris or a shifted blower touches the housing", "Blades scrape while turning", "Rattling or vibration noise"],
-      "test": "Switch off, then turn the blower slowly by hand with a stick.", "expected": "It catches, scrapes or something is lodged inside.",
-      "fix": ["Switch off the AC at the isolator.", "Remove debris from the blower area.", "Re-seat the blower so it does not touch the housing.", "Power on and listen."],
-      "safety": "Never put fingers in the blower while powered.", "sources": ["trane"]
+      "id": "fan_obstructed",
+      "part": "p-fan",
+      "name": "Blower fan obstructed or touching housing",
+      "prior": 0.04,
+      "symptoms": {
+        "noise_rattle": 0.85,
+        "weak_airflow": 0.3
+      },
+      "cause_chain": [
+        "Debris or a shifted blower touches the housing",
+        "Blades scrape while turning",
+        "Rattling or vibration noise"
+      ],
+      "test": "Switch off, then turn the blower slowly by hand with a stick.",
+      "test_minutes": 2,
+      "expected": "It catches, scrapes or something is lodged inside.",
+      "fix": [
+        "Switch off the AC at the isolator.",
+        "Remove debris from the blower area.",
+        "Re-seat the blower so it does not touch the housing.",
+        "Power on and listen."
+      ],
+      "safety": "Never put fingers in the blower while powered.",
+      "sources": [
+        "trane"
+      ]
     },
     {
-      "id": "louver_motor", "part": "p-louver", "name": "Louver (swing) motor faulty", "prior": 0.03,
-      "symptoms": { "louver_stuck": 0.95 },
-      "cause_chain": ["Swing motor or its linkage fails", "Louver no longer moves", "Air blows in one direction only"],
-      "test": "Press the swing button on the remote.", "expected": "The louver does not move at all.",
-      "fix": ["Switch off the AC.", "Check the louver is not blocked or jammed.", "If free but still stuck, the swing motor needs replacement by a technician."],
-      "safety": "", "sources": ["mrcool"]
+      "id": "louver_motor",
+      "part": "p-louver",
+      "name": "Louver (swing) motor faulty",
+      "prior": 0.03,
+      "symptoms": {
+        "louver_stuck": 0.95
+      },
+      "cause_chain": [
+        "Swing motor or its linkage fails",
+        "Louver no longer moves",
+        "Air blows in one direction only"
+      ],
+      "test": "Press the swing button on the remote.",
+      "test_minutes": 1,
+      "expected": "The louver does not move at all.",
+      "fix": [
+        "Switch off the AC.",
+        "Check the louver is not blocked or jammed.",
+        "If free but still stuck, the swing motor needs replacement by a technician."
+      ],
+      "safety": "",
+      "sources": [
+        "mrcool"
+      ]
     },
     {
-      "id": "control_board_fault", "part": "p-pcb", "name": "Control board (PCB) fault", "prior": 0.04,
-      "symptoms": { "no_power": 0.7, "display_error": 0.6, "outdoor_not_running": 0.5, "burn_mark": 0.3 },
-      "cause_chain": ["Power surge or moisture damages the control board", "Board stops sending signals", "Unit fails to start or shows errors"],
-      "test": "Check the breaker is on, then read the error code on the display.", "expected": "Breaker on, but the unit is dead or shows a board error code.",
-      "fix": ["Switch off the AC at the breaker.", "STOP: control board diagnosis needs a qualified technician."],
-      "safety": "High voltage on the board. Do not touch while powered.", "sources": ["mrcool"]
+      "id": "control_board_fault",
+      "part": "p-pcb",
+      "name": "Control board (PCB) fault",
+      "prior": 0.04,
+      "symptoms": {
+        "no_power": 0.7,
+        "display_error": 0.6,
+        "outdoor_not_running": 0.5,
+        "burn_mark": 0.3
+      },
+      "cause_chain": [
+        "Power surge or moisture damages the control board",
+        "Board stops sending signals",
+        "Unit fails to start or shows errors"
+      ],
+      "test": "Check the breaker is on, then read the error code on the display.",
+      "test_minutes": 1,
+      "expected": "Breaker on, but the unit is dead or shows a board error code.",
+      "fix": [
+        "Switch off the AC at the breaker.",
+        "STOP: control board diagnosis needs a qualified technician."
+      ],
+      "safety": "High voltage on the board. Do not touch while powered.",
+      "sources": [
+        "mrcool"
+      ]
     },
     {
-      "id": "sensor_fault", "part": "p-pcb", "name": "Temperature sensor fault", "prior": 0.03,
-      "symptoms": { "display_error": 0.7, "not_cooling": 0.5 },
-      "cause_chain": ["Room or coil sensor drifts or disconnects", "Board reads the wrong temperature", "Unit stops cooling early or shows an error"],
-      "test": "Read the error code and look it up in the unit manual.", "expected": "A sensor-related error code.",
-      "fix": ["Switch off the AC.", "Check the sensor plug on the board is seated.", "If the error stays, a technician should replace the sensor."],
-      "safety": "Isolate power before opening the board cover.", "sources": ["mrcool"]
+      "id": "sensor_fault",
+      "part": "p-pcb",
+      "name": "Temperature sensor fault",
+      "prior": 0.03,
+      "symptoms": {
+        "display_error": 0.7,
+        "not_cooling": 0.5
+      },
+      "cause_chain": [
+        "Room or coil sensor drifts or disconnects",
+        "Board reads the wrong temperature",
+        "Unit stops cooling early or shows an error"
+      ],
+      "test": "Read the error code and look it up in the unit manual.",
+      "test_minutes": 2,
+      "expected": "A sensor-related error code.",
+      "fix": [
+        "Switch off the AC.",
+        "Check the sensor plug on the board is seated.",
+        "If the error stays, a technician should replace the sensor."
+      ],
+      "safety": "Isolate power before opening the board cover.",
+      "sources": [
+        "mrcool"
+      ]
     },
     {
-      "id": "cover_loose", "part": "p-cover", "name": "Front cover or panel loose", "prior": 0.03,
-      "symptoms": { "noise_rattle": 0.7 },
-      "cause_chain": ["Clips or screws on the front cover loosen", "Panel vibrates with the fan", "Rattling noise"],
-      "test": "Press gently on the front cover while the unit runs.", "expected": "The rattle stops when you press.",
-      "fix": ["Switch off the AC.", "Re-seat the front cover clips.", "Tighten any loose screws.", "Power on and listen."],
-      "safety": "", "sources": ["trane"]
+      "id": "cover_loose",
+      "part": "p-cover",
+      "name": "Front cover or panel loose",
+      "prior": 0.03,
+      "symptoms": {
+        "noise_rattle": 0.7
+      },
+      "cause_chain": [
+        "Clips or screws on the front cover loosen",
+        "Panel vibrates with the fan",
+        "Rattling noise"
+      ],
+      "test": "Press gently on the front cover while the unit runs.",
+      "test_minutes": 1,
+      "expected": "The rattle stops when you press.",
+      "fix": [
+        "Switch off the AC.",
+        "Re-seat the front cover clips.",
+        "Tighten any loose screws.",
+        "Power on and listen."
+      ],
+      "safety": "",
+      "sources": [
+        "trane"
+      ]
     }
-  ]
+  ],
+  "test_minutes_note": "Rough time for each test, estimated by the Ustad team (not from the sources); used to order checks."
 }

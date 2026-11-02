@@ -21,6 +21,8 @@ Android prototype for Meta Wearables Studio UAE. Built on Meta's CameraAccess sa
 | 📞 **Live expert** | Job summary to a senior on WhatsApp, then a glasses video call ("Hey Meta, video call … on WhatsApp") |
 | 🕶 **Ray-Ban Display** | With display glasses, the cause / step and the exploded view appear in the lens (mwdat-display) |
 | 🗣 **Voice** | ElevenLabs or phone voice; Talk, Hands-free, your own wake word; commands in 6 languages; Ask Ustad |
+| 🎯 **Accuracy test** | Photos with a known cause → top-1 / top-3 accuracy and a shareable report (brain learning switched off, so the score is fair) |
+| ⏱ **Check in this order** | The brain orders checks by likelihood per minute of testing, the quickest likely causes first |
 | 🔒 **Privacy** | Faces and number plates blurred on the phone; photos and sound only on command; optional backend holds all keys |
 
 ## Ustad's brain

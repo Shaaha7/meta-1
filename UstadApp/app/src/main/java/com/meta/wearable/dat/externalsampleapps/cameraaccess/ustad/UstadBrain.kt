@@ -34,6 +34,8 @@ data class KbFailure(
     val likelihood: Map<String, Double>,
     val causeChain: List<String>,
     val test: String,
+    /** Rough minutes the test takes (used to check the quickest likely causes first). */
+    val testMinutes: Double = 2.0,
     val expected: String,
     val fix: List<String>,
     val safety: String,
@@ -109,6 +111,7 @@ class KnowledgeBase(
             likelihood = lk.keys().asSequence().associateWith { lk.getDouble(it) },
             causeChain = f.getJSONArray("cause_chain").let { a -> List(a.length()) { a.getString(it) } },
             test = f.getString("test"),
+            testMinutes = f.optDouble("test_minutes", 2.0).coerceAtLeast(0.25),
             expected = f.getString("expected"),
             fix = f.getJSONArray("fix").let { a -> List(a.length()) { a.getString(it) } },
             safety = f.optString("safety"),
@@ -159,6 +162,29 @@ class KnowledgeBase(
         modelCases = known.count(sameModel),
         modelHistory = known.filter(sameModel).groupingBy { it.failureId }.eachCount(),
     )
+  }
+
+  /**
+   * Which causes to check, in which order: most likely per minute of testing first. For a single
+   * fault and tests that settle it, checking in decreasing probability / cost order minimises the
+   * expected time to find the cause (the classic troubleshooting-sequence result used in
+   * decision-theoretic troubleshooting). Only causes with at least [minProbability] are listed.
+   */
+  fun checkOrder(evidence: Evidence, ruledOut: Set<String> = emptySet(), limit: Int = 3, minProbability: Double = 0.05): List<RankedFailure> =
+      rank(evidence, ruledOut)
+          .filter { it.probability >= minProbability }
+          .sortedByDescending { it.probability / it.failure.testMinutes }
+          .take(limit)
+
+  /** Expected minutes to find the cause if checks are done in [order] (each test settles one cause). */
+  fun expectedMinutes(order: List<RankedFailure>): Double {
+    var elapsed = 0.0
+    var expected = 0.0
+    for (r in order) {
+      elapsed += r.failure.testMinutes
+      expected += r.probability * elapsed
+    }
+    return expected
   }
 
   /**

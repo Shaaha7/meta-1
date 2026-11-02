@@ -20,7 +20,16 @@ Test it locally (it uses a fake Google/ElevenLabs, no keys needed):
 npm test
 ```
 
-Deploy anywhere that runs Node: Render, Railway, Fly.io, a VPS, or a UAE-region cloud VM. Put it behind HTTPS.
+## Deploy without commands (Render, free plan)
+
+1. Push this repo to GitHub.
+2. On **render.com** → **New → Blueprint** → choose the repo. Render reads `render.yaml`.
+3. Fill in the three secrets it asks for: `USTAD_APP_TOKENS` (make up a long random token), `GEMINI_API_KEY` and `ELEVENLABS_API_KEY`.
+4. You get a URL like `https://ustad-backend.onrender.com`. Put it in the app's `local.properties` as `USTAD_BACKEND_URL`, with `USTAD_APP_TOKEN` set to your token.
+
+The free plan sleeps when idle, so the first request after a while takes about 30 s. For a demo, open `/health` in a browser a minute before you start.
+
+Other hosts: `backend/Dockerfile` runs anywhere Docker runs (Railway, Fly.io, a VPS, or a UAE-region cloud VM). Put it behind HTTPS.
 
 ## App
 

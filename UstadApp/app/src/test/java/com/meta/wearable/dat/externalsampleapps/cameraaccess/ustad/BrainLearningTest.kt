@@ -164,3 +164,33 @@ class BrainLearningTest {
     assertTrue(report.contains("Faces were blurred"))
   }
 }
+
+class CheckOrderTest {
+  private val car = KnowledgeBase.parse(java.io.File("src/main/assets/ustad/kb/car.json").readText())
+
+  @Test
+  fun everyTestHasATime() {
+    car.failures.forEach { assertTrue(it.id, it.testMinutes in 0.25..60.0) }
+  }
+
+  @Test
+  fun quickLikelyChecksComeFirst() {
+    // Car won't start: weak battery (2 min) vs loose terminals (1 min). Per minute, terminals win
+    // unless the battery is more than twice as likely.
+    val ev = mapOf("car_no_start" to true)
+    val order = car.checkOrder(ev)
+    assertTrue(order.isNotEmpty())
+    val ratios = order.map { it.probability / it.failure.testMinutes }
+    assertEquals(ratios.sortedDescending(), ratios)
+  }
+
+  @Test
+  fun thisOrderIsNeverSlowerThanMostLikelyFirst() {
+    listOf(mapOf("car_no_start" to true), mapOf("car_overheating" to true), mapOf("car_brake_squeal" to true), mapOf("car_check_engine" to true))
+        .forEach { ev ->
+          val smart = car.checkOrder(ev, limit = 5)
+          val naive = car.rank(ev).filter { it.probability >= 0.05 }.take(5)
+          assertTrue("$ev", car.expectedMinutes(smart) <= car.expectedMinutes(naive) + 1e-9)
+        }
+  }
+}

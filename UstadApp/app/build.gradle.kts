@@ -33,9 +33,9 @@ android {
     applicationId = "ae.ustad.app"
     minSdk = 31
     targetSdk = 36
-    versionCode = 8
+    versionCode = 9
     // Shown in the Ustad hub, so it's easy to see which build is on the phone.
-    versionName = "2.1 (crash fix + full plan)"
+    versionName = "2.2 (new design + accuracy test)"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

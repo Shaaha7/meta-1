@@ -24,6 +24,14 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Box
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.BatteryChargingFull
+import androidx.compose.material.icons.filled.Insights
+import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material.icons.filled.VideoLibrary
+import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -74,6 +82,7 @@ private sealed interface HubPage {
   data object Passport : HubPage
   data object Battery : HubPage
   data object Dashboard : HubPage
+  data object Benchmark : HubPage
 }
 
 /** Everything Ustad keeps on the phone. Nothing here is uploaded. */
@@ -99,7 +108,10 @@ internal class UstadData(context: Context) {
 }
 
 @Composable
-fun UstadHubScreen(onClose: () -> Unit, initialVideo: Uri? = null) {
+fun UstadHubScreen(onClose: () -> Unit, initialVideo: Uri? = null) = UstadTheme { UstadHubContent(onClose, initialVideo) }
+
+@Composable
+private fun UstadHubContent(onClose: () -> Unit, initialVideo: Uri?) {
   val context = LocalContext.current
   val data = remember { UstadData(context) }
   val client = remember { GeminiClient() }
@@ -144,6 +156,7 @@ fun UstadHubScreen(onClose: () -> Unit, initialVideo: Uri? = null) {
         AssetWebView("dashboard.html", "render($json);", Modifier.fillMaxWidth().weight(1f))
       }
     }
+    HubPage.Benchmark -> BenchmarkScreen(onBack = home)
     HubPage.Battery -> {
       val loop = rememberVoiceLoop()
       UstadPage {
@@ -169,6 +182,7 @@ fun UstadHubScreen(onClose: () -> Unit, initialVideo: Uri? = null) {
           onPassport = { page = HubPage.Passport },
           onBattery = { page = HubPage.Battery },
           onDashboard = { page = HubPage.Dashboard },
+          onBenchmark = { page = HubPage.Benchmark },
       )
     }
   }
@@ -187,6 +201,7 @@ private fun HubHome(
     onPassport: () -> Unit,
     onBattery: () -> Unit,
     onDashboard: () -> Unit,
+    onBenchmark: () -> Unit,
 ) {
   val context = LocalContext.current
   val takePhoto = rememberPhotoCapture(onInspect)
@@ -198,24 +213,23 @@ private fun HubHome(
   val pickVideo = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri -> uri?.let(onTeach) }
   var name by remember { mutableStateOf(data.learnerName) }
 
-  UstadPage {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-      Text("USTAD", color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold)
-      Spacer(Modifier.padding(6.dp))
-      Column {
-        Text("See inside. Learn by doing.", color = Muted, fontSize = 13.sp)
-        Text("v${com.meta.wearable.dat.externalsampleapps.cameraaccess.BuildConfig.VERSION_NAME}", color = Muted, fontSize = 11.sp)
-      }
-      Spacer(Modifier.weight(1f))
-      OutlinedButton(onClick = onClose) { Text("Close", color = Color.White) }
-    }
-    Text(
-        "Expert does the job → Ustad turns it into a lesson → learner is guided step by step. " +
-            "Point at a machine to see the hidden failing part.",
-        color = Muted,
-        fontSize = 13.sp,
+  var tab by remember { mutableStateOf(HubTab.INSPECT) }
+  val casesLearned = remember { data.cases.all().size }
+  Column(Modifier.fillMaxSize().background(Bg)) {
+   Box(Modifier.weight(1f)) {
+    UstadPage(bottomInset = false) {
+    HeroHeader(
+        subtitle = "See inside any machine. Learn by doing.",
+        version = com.meta.wearable.dat.externalsampleapps.cameraaccess.BuildConfig.VERSION_NAME,
+        chips =
+            listOf(
+                (if (com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.UstadVoice.hasElevenLabsKey) "🗣 Natural voice" else "🤖 Phone voice") to Hud,
+                "🧠 $casesLearned fixes learned" to Accent,
+                "📚 ${lessons.size} lessons" to Ok,
+                "🔒 On-device privacy" to Warn,
+            ),
+        onClose = onClose,
     )
-
     var crash by remember { mutableStateOf(com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.CrashLog.last(context)) }
     crash?.let { report ->
       UstadCard("⚠ Ustad closed last time", border = Fault) {
@@ -231,29 +245,21 @@ private fun HubHome(
       }
     }
 
-    UstadCard("🔍 Inspect a machine") {
-      UstadBody("Photo of a car, engine bay or machine → defect, cause chain, and the hidden part in 3D.")
-      Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Button(onClick = takePhoto) { Text("Take photo") }
-        OutlinedButton(onClick = { pickPhoto.launch("image/*") }) { Text("From gallery", color = Color.White) }
-      }
-      Text("With glasses: start a session and tap capture; the photo opens here.", color = Muted, fontSize = 12.sp)
+    if (tab == HubTab.INSPECT) {
+      SectionTitle("Find the fault")
+      ActionTile(Icons.Default.PhotoCamera, "Take a photo", "Car, engine bay, AC or any machine → the failing part in 3D") { takePhoto() }
+      ActionTile(Icons.Default.PhotoLibrary, "From gallery", "Use a photo you already took", Accent) { pickPhoto.launch("image/*") }
+      ActionTile(Icons.Default.BatteryChargingFull, "Battery check", "Lithium packs: health, life left, the weak layer, when to isolate", Ok, onClick = onBattery)
+      SectionTitle("Prove it")
+      ActionTile(Icons.Default.Insights, "Accuracy test", "Score Ustad on photos with a known cause, for your pitch", Warn, onClick = onBenchmark)
+      Text("With glasses: start a session and say “${WakeWord.get(context)}, inspect” or tap capture; the photo opens here.", color = Muted, fontSize = 12.sp)
     }
 
-    UstadCard("🔋 Battery check") {
-      UstadBody("Lithium packs (e-bike, scooter, power bank, tools, storage): health, remaining life, the weak layer in 3D, and when to isolate it.")
-      Button(onClick = onBattery) { Text("Check a battery") }
-      Text("Or just photograph the pack with Inspect: Ustad reads the label and looks for swelling.", color = Muted, fontSize = 12.sp)
-    }
-
-    UstadCard("🎓 Teach: expert records a job") {
-      UstadBody("Record the expert doing the job (glasses or head-mounted phone). Ustad drafts the lesson; the expert approves it.")
-      Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Button(onClick = recordVideo) { Text("Record") }
-        OutlinedButton(onClick = { pickVideo.launch("video/*") }) { Text("Pick video", color = Color.White) }
-      }
-    }
-
+    if (tab == HubTab.LEARN) {
+      SectionTitle("Teach: an expert records a job")
+      ActionTile(Icons.Default.Videocam, "Record an expert", "Glasses or head-mounted phone. Ustad drafts the lesson, the expert approves it") { recordVideo() }
+      ActionTile(Icons.Default.VideoLibrary, "Pick a video", "Turn an existing recording into a lesson", Accent) { pickVideo.launch("video/*") }
+      SectionTitle("Learn")
     UstadCard("📚 Lessons") {
       if (lessons.isEmpty()) UstadBody("No lessons yet.")
       lessons.forEach { l ->
@@ -289,6 +295,9 @@ private fun HubHome(
       OutlinedButton(onClick = onPassport) { Text("Open passport", color = Color.White) }
     }
 
+    }
+
+    if (tab == HubTab.TEAM) {
     UstadCard("📊 Team dashboard") {
       var version by remember { mutableIntStateOf(0) }
       val recordsImporter =
@@ -374,6 +383,9 @@ private fun HubHome(
       Text("Used by “📞 Live expert” and the voice command “call expert”.", color = Muted, fontSize = 12.sp)
     }
 
+    }
+
+    if (tab == HubTab.SETTINGS) {
     UstadCard("🗣 Ustad's voice") {
       var natural by remember { mutableStateOf(com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.UstadVoice.isNatural(context)) }
       val hasKey = com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.UstadVoice.hasElevenLabsKey
@@ -419,6 +431,10 @@ private fun HubHome(
           fontSize = 13.sp,
       )
     }
+    }
+    }
+   }
+   UstadNavBar(tab) { tab = it }
   }
 }
 
@@ -475,12 +491,12 @@ internal fun BrainGraphView(graphJson: String) {
 
 /** Full-screen dark scrolling page used by all Ustad screens. */
 @Composable
-internal fun UstadPage(content: @Composable () -> Unit) {
+internal fun UstadPage(bottomInset: Boolean = true, content: @Composable () -> Unit) {
   Column(
       Modifier.fillMaxSize()
           .background(Bg)
           .statusBarsPadding()
-          .navigationBarsPadding()
+          .then(if (bottomInset) Modifier.navigationBarsPadding() else Modifier)
           .verticalScroll(rememberScrollState())
           .padding(16.dp),
       verticalArrangement = Arrangement.spacedBy(12.dp),
