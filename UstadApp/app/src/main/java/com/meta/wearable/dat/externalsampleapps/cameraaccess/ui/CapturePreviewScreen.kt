@@ -67,6 +67,7 @@ fun CapturePreviewScreen(
     preview: CapturePreview,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
+    onMakeLesson: (() -> Unit)? = null,
 ) {
   val context = LocalContext.current
 
@@ -112,6 +113,15 @@ fun CapturePreviewScreen(
             )
           }
           Text(text = stringResource(R.string.share), color = Color.White)
+          // Ustad: the expert's recording becomes a lesson for learners.
+          if (preview is CapturePreview.Video && onMakeLesson != null) {
+            androidx.compose.material3.Button(
+                onClick = onMakeLesson,
+                modifier = Modifier.padding(top = 12.dp),
+            ) {
+              Text("🎓 Make lesson with Ustad")
+            }
+          }
         }
       }
 

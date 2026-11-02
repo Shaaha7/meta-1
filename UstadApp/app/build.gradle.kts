@@ -62,14 +62,15 @@ android {
         "String",
         "OPENROUTER_MODEL",
         "\"${localProperties.getProperty("OPENROUTER_MODEL", "dots-studio/dots-3-note-preview:free")}\"")
-    // Offline backup: local Ollama on the laptop, reached from the phone over USB via
+    // Offline backup: Meta's Llama 3.2 Vision on the laptop through Ollama
+    // (`ollama pull llama3.2-vision`), reached from the phone over USB via
     // `adb reverse tcp:11434 tcp:11434`. Set LOCAL_AI_URL= (empty) to disable.
     buildConfigField(
         "String",
         "LOCAL_AI_URL",
         "\"${localProperties.getProperty("LOCAL_AI_URL", "http://127.0.0.1:11434/v1/chat/completions")}\"")
     buildConfigField(
-        "String", "LOCAL_AI_MODEL", "\"${localProperties.getProperty("LOCAL_AI_MODEL", "gemma3:latest")}\"")
+        "String", "LOCAL_AI_MODEL", "\"${localProperties.getProperty("LOCAL_AI_MODEL", "llama3.2-vision")}\"")
     // Natural voice: ElevenLabs (free plan ~10k characters/month). Empty key = phone's own voice.
     buildConfigField(
         "String",
@@ -112,6 +113,11 @@ dependencies {
   implementation(libs.mwdat.core)
   implementation(libs.mwdat.camera)
   implementation(libs.mwdat.mockdevice)
+  // Ustad: on-device face detection (bundled model, works offline) for the privacy filter.
+  implementation(libs.mlkit.face.detection)
+  testImplementation(libs.junit)
+  // Real org.json for JVM unit tests (the Android one is a stub there).
+  testImplementation(libs.org.json)
   androidTestImplementation(libs.androidx.ui.test.junit4)
   androidTestImplementation(libs.androidx.test.uiautomator)
   androidTestImplementation(libs.androidx.test.rules)

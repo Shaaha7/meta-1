@@ -114,6 +114,8 @@ fun CameraScreen(
   val wearablesUi by wearablesViewModel.uiState.collectAsStateWithLifecycle()
   val activity = LocalActivity.current
   var showSettingsMenu by remember { mutableStateOf(false) }
+  // Ustad: the recording being turned into a lesson (kept until the lesson flow closes).
+  var lessonFromVideo by remember { mutableStateOf(false) }
 
   val isUpdateRequired = wearablesUi.isFirmwareUpdateRequired
 
@@ -167,15 +169,28 @@ fun CameraScreen(
       )
     }
 
-    // Ustad: a photo from the glasses goes straight into inspection; videos keep the share preview.
+    // Ustad: a photo from the glasses goes straight into inspection. A recording can be shared,
+    // or turned into a lesson (the expert wore the glasses while doing the job).
     when (val preview = ui.activePreview) {
       is CapturePreview.Photo ->
           UstadScreen(photo = preview.bitmap, onDismiss = { cameraViewModel.dismissCapturePreview() })
       is CapturePreview.Video ->
-          CapturePreviewScreen(
-              preview = preview,
-              onDismiss = { cameraViewModel.dismissCapturePreview() },
-          )
+          if (lessonFromVideo) {
+            // The temp recording is deleted on dismiss, so dismiss only once the lesson is done.
+            UstadHubScreen(
+                initialVideo = preview.uri,
+                onClose = {
+                  lessonFromVideo = false
+                  cameraViewModel.dismissCapturePreview()
+                },
+            )
+          } else {
+            CapturePreviewScreen(
+                preview = preview,
+                onDismiss = { cameraViewModel.dismissCapturePreview() },
+                onMakeLesson = { lessonFromVideo = true },
+            )
+          }
       null -> Unit
     }
 

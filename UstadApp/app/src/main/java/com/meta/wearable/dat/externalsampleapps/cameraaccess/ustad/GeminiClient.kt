@@ -18,9 +18,30 @@ import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 
-/** Part IDs of the 3D/exploded models in the Ustad machine library. */
+/** Part IDs of the hand-built 3D/exploded models in the Ustad machine library. */
 object MachineLibrary {
   const val AC_INDOOR = "split_ac_indoor"
+
+  /** Matches assets/ustad/car.html and the "part" of each failure in kb/car.json. */
+  val carParts =
+      linkedMapOf(
+          "c-body" to "Body shell",
+          "c-hood" to "Hood (bonnet)",
+          "c-bumper" to "Front bumper",
+          "c-engine" to "Engine",
+          "c-radiator" to "Radiator & coolant",
+          "c-battery12" to "12V battery",
+          "c-gearbox" to "Transmission",
+          "c-suspension" to "Suspension (front strut)",
+          "c-brake" to "Brakes (disc & pads)",
+          "c-wheel-fl" to "Front-left wheel & tire",
+          "c-wheel-fr" to "Front-right wheel & tire",
+          "c-wheel-rl" to "Rear-left wheel & tire",
+          "c-wheel-rr" to "Rear-right wheel & tire",
+          "c-hvbattery" to "High-voltage battery (EV/hybrid)",
+          "c-fuel-tank" to "Fuel tank",
+          "c-exhaust" to "Exhaust",
+      )
 
   val acParts =
       linkedMapOf(
@@ -36,6 +57,9 @@ object MachineLibrary {
 }
 
 class GeminiException(message: String, val retryable: Boolean = false) : Exception(message)
+
+/** Result of checking a learner's checkpoint photo against what the step must show. */
+data class StepCheck(val pass: Boolean, val feedback: String)
 
 class GeminiClient(
     private val apiKey: String = BuildConfig.GEMINI_API_KEY,
@@ -55,14 +79,19 @@ class GeminiClient(
   val isConfigured: Boolean
     get() = apiKey.isNotBlank() || openRouterKey.isNotBlank() || localUrl.isNotBlank()
 
+  /** True when only the laptop's local model is set up (no cloud key in local.properties). */
+  private val localOnly: Boolean
+    get() = apiKey.isBlank() && openRouterKey.isBlank()
+
+  private fun partList(parts: Map<String, String>) = parts.entries.joinToString("\n") { "- ${it.key}: ${it.value}" }
+
   /** Which provider and model produced the last answer, shown to the user for transparency. */
   @Volatile
   var lastProvider: String = ""
     private set
 
   suspend fun inspect(photo: Bitmap, technicianNote: String, kbSymptoms: Collection<KbSymptom> = emptyList()): Inspection {
-    val visual = kbSymptoms.filter { it.visual }.joinToString("\n") { "- ${it.id}: ${it.label}" }
-    val parts = MachineLibrary.acParts.entries.joinToString("\n") { "- ${it.key}: ${it.value}" }
+    val visual = kbSymptoms.filter { it.visual }.distinctBy { it.id }.joinToString("\n") { "- ${it.id}: ${it.label}" }
     val prompt =
         """
         You are Ustad, a master technician with 30 years of experience, looking through a
@@ -77,17 +106,20 @@ class GeminiClient(
            in under 1 minute to confirm it, with the expected result if it is true.
         4. Flag any safety hazard (electricity, gas, refrigerant, high pressure, battery).
 
+        If the machine is a CAR (any car, SUV, pickup, EV or hybrid), part_id MUST be one of:
+        ${partList(MachineLibrary.carParts)}
         If the machine is a split air-conditioner indoor unit, part_id MUST be one of:
-        $parts
+        ${partList(MachineLibrary.acParts)}
         For any other machine use short kebab-case part ids of your own.
         If the photo is too unclear to judge, set need_better_view true and tell the user what to do.
         For the 3D exploded view, list 6 to 10 main INTERNAL parts of this machine in
         internal_parts (include every part_id used in diagnoses, same ids). shape is one of
         box, cylinder, sphere, tube. size is [width,height,depth] in rough relative units 0.2-4.
         layer orders parts from outermost front (3) to innermost/back (-3). color is a realistic hex.
-        If the machine is a split air-conditioner indoor unit, ALSO report in kb_symptoms each of
-        these ids as "present", "absent" or "unknown" based ONLY on what is visible in the photo
-        (use "unknown" when you cannot see it). Read any error code shown into error_code.
+        If the machine is a car or a split air-conditioner, ALSO report in kb_symptoms each of
+        these ids that applies to it as "present", "absent" or "unknown" based ONLY on what is
+        visible in the photo (use "unknown" when you cannot see it). Read any error or warning
+        code shown into error_code.
         $visual
         If nothing visible indicates a fault, set fault_found false, return an empty diagnoses
         list, and say so in voice_summary. Leave safety.hazard empty when there is no hazard.
@@ -107,7 +139,69 @@ class GeminiClient(
          "need_better_view":false,"user_instruction":""}
         """
             .trimIndent()
-    return parseInspection(generate(prompt, photo))
+    return parseInspection(generate(prompt, listOf(photo)))
+  }
+
+  /**
+   * Capture → Lesson: turns key frames of an expert doing a job into a draft lesson the expert
+   * reviews before learners see it. [frames] must already be face-blurred.
+   */
+  suspend fun buildLesson(frames: FrameSet, expertNote: String, language: String = "English"): Lesson {
+    val timeline = frames.frames.mapIndexed { i, f -> "#${i + 1} at ${f.atSec}s" }.joinToString(", ")
+    val prompt =
+        """
+        You are Ustad, a master technician and patient teacher. The images are key frames, in
+        order, from a video recorded through the smart glasses of an EXPERT doing a real job
+        ($timeline; video length ${frames.durationSec}s). Turn what the expert did into a lesson
+        that will guide an APPRENTICE wearing the glasses through the same job, hands-free.
+
+        Expert's note (may be empty, trust it over your guesses): "$expertNote"
+
+        Rules:
+        - Identify the machine and the job. Steps follow what the expert actually did, in order.
+          Fill obvious gaps (e.g. safety isolation) and mark them "(added by Ustad)" in why.
+        - 4 to 10 steps. say: ONE action, max 15 words, spoken to the apprentice.
+        - why: one sentence on why this step matters (the reasoning an expert carries in their head).
+        - safety: the hazard for this step, or "" if none.
+        - Mark 1 to 3 critical steps checkpoint=true with must_show: what a photo of the result must show.
+        - at_sec: the frame time where the step is seen, or -1.
+        - If the machine is a CAR, part_id MUST be one of:
+        ${partList(MachineLibrary.carParts)}
+          If it is a split air-conditioner, part_id MUST be one of:
+        ${partList(MachineLibrary.acParts)}
+          Otherwise use short kebab-case ids and describe 5 to 10 internal parts in internal_parts.
+        - quiz: 3 multiple-choice questions that test UNDERSTANDING (why), not memory. 3 options,
+          answer is the 0-based index of the correct option, explain in one sentence.
+        - Write title, summary, say, why, safety, quiz in $language.
+        - If the frames don't show a clear job, return an empty steps list and explain in summary.
+
+        Return ONLY JSON:
+        {"title":"","machine":"","summary":"max 30 words",
+         "steps":[{"title":"","say":"","why":"","safety":"","checkpoint":false,"must_show":"","part_id":"","at_sec":-1}],
+         "quiz":[{"question":"","options":["","",""],"answer":0,"explain":""}],
+         "internal_parts":[{"id":"","name":"","shape":"box","size":[1,1,1],"layer":0,"color":"#8a96a3"}]}
+        """
+            .trimIndent()
+    val sheet = VideoFrames.contactSheet(frames.frames)
+    return parseLesson(generate(prompt, frames.frames.map { it.image }, singleImage = sheet))
+  }
+
+  /** Guide: checks a learner's checkpoint photo. Strict about safety, kind in tone. */
+  suspend fun checkStep(photo: Bitmap, machine: String, step: LessonStep, language: String): StepCheck {
+    val prompt =
+        """
+        You are Ustad checking an apprentice's work through their smart glasses.
+        Machine: $machine
+        Step: ${step.say}
+        The photo MUST show: ${step.mustShow.ifBlank { step.say }}
+        Judge ONLY from the photo. If it is unclear or does not show it, pass is false.
+        feedback: max 20 words in $language, spoken to the apprentice: what is right, or exactly
+        what to fix or how to show it better.
+        Return ONLY JSON: {"pass":false,"feedback":""}
+        """
+            .trimIndent()
+    val json = generate(prompt, listOf(photo))
+    return StepCheck(json.optBoolean("pass", false), json.optString("feedback"))
   }
 
   suspend fun repairSteps(inspection: Inspection, diagnosis: Diagnosis, language: String): List<RepairStep> {
@@ -129,7 +223,7 @@ class GeminiClient(
         {"steps":[{"say":"","checkpoint":false,"checkpoint_must_show":"","safety_stop":false}]}
         """
             .trimIndent()
-    return parseRepairSteps(generate(prompt, null))
+    return parseRepairSteps(generate(prompt, emptyList()))
   }
 
   /** Translation only: the knowledge base is written in English; the LLM must not add content. */
@@ -141,20 +235,26 @@ class GeminiClient(
         remove or change any information. Return ONLY JSON: {"lines":["", ...]} with the same count.
         ${JSONArray(lines)}
         """.trimIndent()
-    val out = generate(prompt, null).optJSONArray("lines") ?: return lines
+    val out = generate(prompt, emptyList()).optJSONArray("lines") ?: return lines
     return if (out.length() == lines.size) List(out.length()) { out.getString(it) } else lines
   }
 
-  private suspend fun generate(prompt: String, photo: Bitmap?): JSONObject =
+  /**
+   * Sends [prompt] with [images] to the first AI provider that answers. Gemini receives every
+   * image; OpenAI-compatible providers (OpenRouter, local Llama) receive [singleImage] instead,
+   * because many vision models there accept only one image per request.
+   */
+  private suspend fun generate(prompt: String, images: List<Bitmap>, singleImage: Bitmap? = images.singleOrNull()): JSONObject =
       withContext(Dispatchers.IO) {
         if (!isConfigured) throw GeminiException("Add GEMINI_API_KEY, OPENROUTER_API_KEY or LOCAL_AI_URL to local.properties")
-        val jpeg = photo?.toBase64Jpeg()
+        val jpegs = images.map { it.toBase64Jpeg() }
+        val jpeg = if (singleImage != null && images.size != 1) singleImage.toBase64Jpeg() else jpegs.singleOrNull()
         var lastError: GeminiException? = null
 
         // 1) Gemini. Free-tier models often answer 503 (high demand) or 429 (rate limit), so try
         // each model once with a short backoff instead of waiting on one busy model.
         if (apiKey.isNotBlank()) {
-          val body = geminiBody(prompt, jpeg)
+          val body = geminiBody(prompt, jpegs)
           for (candidate in (listOf(model) + FALLBACK_MODELS).distinct()) {
             try {
               return@withContext callGemini(candidate, body).also { lastProvider = "Gemini · $candidate" }
@@ -183,15 +283,20 @@ class GeminiClient(
           try {
             return@withContext callOpenAiCompatible("Local", localUrl, "", localModel, prompt, jpeg)
           } catch (e: GeminiException) {
-            lastError = e
+            lastError =
+                if (localOnly)
+                    GeminiException(
+                        "No cloud AI key is set and the local AI at $localUrl didn't answer. Add GEMINI_API_KEY " +
+                            "to local.properties, or start Ollama and run: adb reverse tcp:11434 tcp:11434")
+                else e
           }
         }
         throw lastError ?: GeminiException("No AI provider answered")
       }
 
-  private fun geminiBody(prompt: String, jpeg: String?): JSONObject {
+  private fun geminiBody(prompt: String, jpegs: List<String>): JSONObject {
     val parts = JSONArray().put(JSONObject().put("text", prompt))
-    if (jpeg != null) {
+    jpegs.forEach { jpeg ->
       parts.put(JSONObject().put("inline_data", JSONObject().put("mime_type", "image/jpeg").put("data", jpeg)))
     }
     return JSONObject()
@@ -257,7 +362,7 @@ class GeminiClient(
         (URL(endpoint).openConnection() as HttpURLConnection).apply {
           requestMethod = "POST"
           connectTimeout = 10_000
-          readTimeout = READ_TIMEOUT_MS
+          readTimeout = if (body.toString().length > 400_000) READ_TIMEOUT_MS * 3 else READ_TIMEOUT_MS
           doOutput = true
           setRequestProperty("Content-Type", "application/json")
           headers.forEach { (k, v) -> setRequestProperty(k, v) }

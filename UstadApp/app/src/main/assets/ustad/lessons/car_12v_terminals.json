@@ -1,0 +1,24 @@
+{
+  "id": "builtin-car-12v-terminals",
+  "title": "Clean corroded 12V battery terminals",
+  "machine": "Car (any petrol, hybrid or EV with a 12V battery)",
+  "kind": "CAR",
+  "summary": "White or green crust on the 12V battery terminals blocks current and causes slow cranking or no start. Clean them safely in the right order.",
+  "author": "Ustad built-in",
+  "steps": [
+    {"title": "Make it safe", "say": "Engine off, key out, handbrake on. Put on gloves and eye protection.", "why": "No current is flowing and the car cannot move while you work.", "safety": "Battery acid burns skin and eyes. Never smoke or make sparks near a battery.", "checkpoint": false, "must_show": "", "part_id": "c-battery12", "at_sec": -1},
+    {"title": "Find the terminals", "say": "Find the 12V battery. Positive is red or marked plus, negative is black or minus.", "why": "The order you remove the clamps in is what keeps you safe, so you must know which is which.", "safety": "In an EV or hybrid, touch only the small 12V battery. Never touch orange high-voltage cables.", "checkpoint": false, "must_show": "", "part_id": "c-battery12", "at_sec": -1},
+    {"title": "Negative off first", "say": "Loosen and remove the NEGATIVE clamp first. Move the cable away from the battery.", "why": "If your spanner touches the car body while the negative is off, there is no circuit, so no sparks.", "safety": "", "checkpoint": true, "must_show": "the black negative cable removed and lying clear of the battery terminal", "part_id": "c-battery12", "at_sec": -1},
+    {"title": "Then positive off", "say": "Now remove the POSITIVE clamp.", "why": "With the negative already off, the positive can no longer short to the body.", "safety": "", "checkpoint": false, "must_show": "", "part_id": "c-battery12", "at_sec": -1},
+    {"title": "Scrub the crust", "say": "Scrub terminals and clamps with baking soda, water and a wire brush.", "why": "Baking soda neutralises the acid. The crust is an insulator that blocks starting current.", "safety": "Keep the mix out of the battery vents.", "checkpoint": false, "must_show": "", "part_id": "c-battery12", "at_sec": -1},
+    {"title": "Rinse and dry", "say": "Wipe with a little clean water, then dry everything completely.", "why": "Leftover moisture and soda start new corrosion.", "safety": "", "checkpoint": false, "must_show": "", "part_id": "c-battery12", "at_sec": -1},
+    {"title": "Refit: positive, then negative", "say": "Fit POSITIVE first, then NEGATIVE. Tighten until the clamps do not twist.", "why": "The reverse order keeps the tool safe. A loose clamp causes the same no-start as corrosion.", "safety": "", "checkpoint": true, "must_show": "both clamps fitted tight: red cable on the positive post, black cable on the negative post, terminals clean", "part_id": "c-battery12", "at_sec": -1},
+    {"title": "Protect the terminals", "say": "Put a thin layer of terminal grease or petroleum jelly on both terminals.", "why": "It seals out air and moisture so corrosion comes back much slower.", "safety": "", "checkpoint": false, "must_show": "", "part_id": "c-battery12", "at_sec": -1},
+    {"title": "Test it", "say": "Start the car. The battery warning light should go off.", "why": "If it still cranks slowly, the battery itself may be weak. Test or replace it.", "safety": "", "checkpoint": false, "must_show": "", "part_id": "c-engine", "at_sec": -1}
+  ],
+  "quiz": [
+    {"question": "Why do you remove the NEGATIVE clamp first?", "options": ["It is closer to you", "If your tool touches the car body, there is no short circuit", "The positive is always more rusted"], "answer": 1, "explain": "The car body is connected to negative. With negative off, touching the body can't make a spark."},
+    {"question": "Why use baking soda?", "options": ["It neutralises battery acid", "It recharges the battery", "It makes the clamps shiny"], "answer": 0, "explain": "The crust is acidic; baking soda neutralises it so it can be washed away safely."},
+    {"question": "Corroded terminals usually cause…", "options": ["Slow cranking or no start", "Engine overheating", "Brake squeal"], "answer": 0, "explain": "The crust resists the big current the starter motor needs."}
+  ]
+}

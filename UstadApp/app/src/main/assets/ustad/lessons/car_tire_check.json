@@ -1,0 +1,22 @@
+{
+  "id": "builtin-car-tire-check",
+  "title": "Check tire pressure and tread",
+  "machine": "Car (any)",
+  "kind": "CAR",
+  "summary": "Low pressure and worn tread are the most common tire faults. Check pressure cold, compare with the door sticker, and inspect tread and sidewalls.",
+  "author": "Ustad built-in",
+  "steps": [
+    {"title": "Tires cold", "say": "Check tires cold: parked for a few hours or driven only a short way.", "why": "Driving heats the air inside, so hot tires read higher than they really are.", "safety": "Park on flat ground away from traffic, hazard lights on.", "checkpoint": false, "must_show": "", "part_id": "c-wheel-fl", "at_sec": -1},
+    {"title": "Find the right pressure", "say": "Read the recommended pressure on the driver's door-frame sticker.", "why": "The number on the tire sidewall is the MAXIMUM, not the right pressure for this car.", "safety": "", "checkpoint": false, "must_show": "", "part_id": "c-wheel-fl", "at_sec": -1},
+    {"title": "Measure", "say": "Remove the valve cap, press the gauge firmly on the valve and read it.", "why": "A hissing gauge means it's not sealed and the reading will be low.", "safety": "", "checkpoint": true, "must_show": "a pressure gauge pressed onto the tire valve with a readable reading", "part_id": "c-wheel-fl", "at_sec": -1},
+    {"title": "Adjust", "say": "Inflate or release air to the sticker pressure, then measure again.", "why": "Under-inflated tires overheat, wear the edges and make the car pull to one side.", "safety": "", "checkpoint": false, "must_show": "", "part_id": "c-wheel-fl", "at_sec": -1},
+    {"title": "Check tread", "say": "Check the tread. Replace the tire if it is level with the wear bars.", "why": "Wear bars sit at about 1.6 mm, a common legal minimum. Below it, braking in the wet gets much longer.", "safety": "", "checkpoint": false, "must_show": "", "part_id": "c-wheel-fl", "at_sec": -1},
+    {"title": "Check the sidewall", "say": "Look along the sidewall for bulges, cuts or cracks.", "why": "A bulge means the inner cords are broken. The tire can burst.", "safety": "Bulge or deep cut: do not drive far. Fit the spare and replace the tire.", "checkpoint": true, "must_show": "a close, clear view of the tire sidewall", "part_id": "c-wheel-fl", "at_sec": -1},
+    {"title": "Finish", "say": "Refit the valve caps and repeat for all four tires and the spare.", "why": "The cap keeps dirt and moisture out of the valve so it does not leak.", "safety": "", "checkpoint": false, "must_show": "", "part_id": "c-wheel-rr", "at_sec": -1}
+  ],
+  "quiz": [
+    {"question": "Why measure tire pressure when the tires are cold?", "options": ["Hot tires read higher than they really are", "The gauge only works when cold", "It is more comfortable"], "answer": 0, "explain": "Heat expands the air, so a hot reading hides under-inflation."},
+    {"question": "Where do you find the right pressure for the car?", "options": ["The number on the tire sidewall", "The driver's door-frame sticker or owner's manual", "Always 40 psi"], "answer": 1, "explain": "The sidewall shows the tire's maximum; the car maker's sticker shows the right pressure."},
+    {"question": "You find a bulge on the sidewall. What does it mean?", "options": ["Internal damage: replace the tire", "It is only over-inflated", "Normal for new tires"], "answer": 0, "explain": "Broken inner cords let air push the rubber out; it can burst."}
+  ]
+}

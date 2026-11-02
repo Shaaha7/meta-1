@@ -44,8 +44,12 @@ class KnowledgeBase(val title: String, val symptoms: Map<String, KbSymptom>, val
     /** Probability a symptom shows up even though this failure doesn't list it (noise/other causes). */
     private const val LEAK = 0.04
 
-    fun load(context: Context, machine: String): KnowledgeBase {
-      val json = JSONObject(context.assets.open("ustad/kb/$machine.json").bufferedReader().use { it.readText() })
+    fun load(context: Context, machine: String): KnowledgeBase =
+        parse(context.assets.open("ustad/kb/$machine.json").bufferedReader().use { it.readText() })
+
+    /** Parses a knowledge-base JSON file (kept separate from [load] so it can be unit-tested). */
+    fun parse(text: String): KnowledgeBase {
+      val json = JSONObject(text)
       val src = json.getJSONObject("sources")
       val sources = src.keys().asSequence().associateWith { k ->
         src.getJSONObject(k).let { KbSource(it.getString("name"), it.getString("url")) }

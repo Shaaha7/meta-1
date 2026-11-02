@@ -58,7 +58,8 @@ import com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.CoachLanguage
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.GeminiClient
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.Inspection
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.KnowledgeBase
-import com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.MachineLibrary
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.MachineKind
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.MachineRouter
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.PrivacyFilter
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.RepairStep
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.UstadVoice
@@ -86,7 +87,10 @@ fun UstadScreen(photo: Bitmap, onDismiss: () -> Unit) {
   val scope = rememberCoroutineScope()
   val client = remember { GeminiClient() }
   val voice = remember { UstadVoice(context) }
-  val kb = remember { runCatching { KnowledgeBase.load(context, "split_ac") }.getOrNull() }
+  // Ustad's expert knowledge bases, one per machine kind it knows deeply (car, split AC).
+  val kbs = remember {
+    MachineKind.entries.mapNotNull { k -> k.kbFile?.let { f -> runCatching { k to KnowledgeBase.load(context, f) }.getOrNull() } }.toMap()
+  }
   DisposableEffect(Unit) { onDispose { voice.shutdown() } }
 
   var phase by remember { mutableStateOf<Phase>(Phase.Analyzing) }
@@ -111,7 +115,7 @@ fun UstadScreen(photo: Bitmap, onDismiss: () -> Unit) {
     val privacy = PrivacyFilter.blurFaces(photo)
     safePhoto = privacy.image
     facesBlurred = privacy.facesBlurred
-    runCatching { client.inspect(privacy.image, "", kb?.symptoms?.values.orEmpty()) }
+    runCatching { client.inspect(privacy.image, "", kbs.values.flatMap { it.symptoms.values }) }
         .onSuccess {
           inspection = it
           dxIndex = 0
@@ -156,7 +160,7 @@ fun UstadScreen(photo: Bitmap, onDismiss: () -> Unit) {
       is Phase.Failed ->
           UstadCard("Couldn't diagnose") {
             Text(p.message, color = Fault)
-            Text("The free AI service is busy. Wait a few seconds and retry.", color = Muted, fontSize = 13.sp)
+            Text("If the AI service is busy, wait a few seconds and retry.", color = Muted, fontSize = 13.sp)
             Button(onClick = { attempt++ }) { Text("Retry") }
           }
       else -> {
@@ -166,8 +170,10 @@ fun UstadScreen(photo: Bitmap, onDismiss: () -> Unit) {
           return@Column
         }
         // Machines in Ustad's knowledge base are diagnosed by Ustad's own model, not the AI.
-        if (kb != null && isAirConditioner(insp)) {
-          AcExpertPanel(insp, kb, client, language, onLanguage = { language = it }, say = ::say)
+        val kind = MachineRouter.detect(insp)
+        val kb = kbs[kind]
+        if (kb != null) {
+          ExpertPanel(insp, kind, kb, client, language, onLanguage = { language = it }, say = ::say)
           if (voiceNote.isNotBlank()) Text(voiceNote, color = Muted, fontSize = 12.sp)
           return@Column
         }
@@ -179,7 +185,7 @@ fun UstadScreen(photo: Bitmap, onDismiss: () -> Unit) {
             Text(client.lastProvider, color = Muted, fontSize = 12.sp)
           }
           UstadCard("✅ No fault found") { UstadBody(insp.voiceSummary.ifBlank { "Nothing visible looks wrong. Point Ustad at the symptom, like a leak or burn mark." }) }
-          if (isAirConditioner(insp)) UstadCard("Inside view") { ExplodedView(emptyList()) }
+          if (kind.hasExpertModel) UstadCard("Inside view") { ExplodedView(emptyList(), page = kind.page) }
           return@Column
         }
 
@@ -200,8 +206,8 @@ fun UstadScreen(photo: Bitmap, onDismiss: () -> Unit) {
 
         if (dx != null) {
           UstadCard("Inside view") {
-            if (isAirConditioner(insp)) {
-              ExplodedView(listOfNotNull(libraryPart(dx)))
+            if (kind.hasExpertModel) {
+              ExplodedView(listOfNotNull(MachineRouter.modelPart(kind, dx.partId, dx.partName)), page = kind.page)
             } else {
               ExplodedView(listOf(dx.partId), partsJson = partsLayout(insp))
             }
@@ -296,35 +302,22 @@ private fun partsLayout(insp: Inspection): String {
   return out.toString()
 }
 
-/** True for any air-conditioner the AI names, even if it used its own part ids. */
-private fun isAirConditioner(insp: Inspection): Boolean {
-  val type = "${insp.machine.type} ${insp.machine.model}".lowercase()
-  return insp.diagnoses.any { it.partId in MachineLibrary.acParts } ||
-      listOf("air con", "air-con", "aircon", "conditioner", "split", "a/c", "hvac", "ac unit", "indoor unit").any { it in type } ||
-      Regex("""ac""").containsMatchIn(type)
-}
-
-/** Maps the AI's part to a part of the 3D AC model by id or by keywords in its name. */
-private fun libraryPart(dx: com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.Diagnosis): String? {
-  if (dx.partId in MachineLibrary.acParts) return dx.partId
-  val n = "${dx.partId} ${dx.partName}".lowercase()
-  return listOf(
-      "p-pipe" to listOf("pipe", "hose", "line", "outlet"),
-      "p-pan" to listOf("pan", "tray", "drain", "condensate"),
-      "p-filter" to listOf("filter", "dust"),
-      "p-coil" to listOf("coil", "evaporator", "fin", "refrigerant", "copper"),
-      "p-fan" to listOf("fan", "blower", "motor", "bearing"),
-      "p-pcb" to listOf("board", "pcb", "control", "sensor", "electr", "wiring"),
-      "p-louver" to listOf("louver", "louvre", "vane", "flap", "swing"),
-      "p-cover" to listOf("cover", "panel", "casing", "housing"),
-  ).firstOrNull { (_, words) -> words.any { it in n } }?.first
+@Composable
+internal fun ExplodedView(
+    partIds: List<String>,
+    page: String = MachineKind.SPLIT_AC.page,
+    partsJson: String? = null,
+    height: androidx.compose.ui.unit.Dp = 400.dp,
+) {
+  // Known machines (car, AC) use their hand-built 3D model; any other machine is drawn from the
+  // AI's part layout by the generic viewer. Changing the page needs a new WebView, hence key().
+  val url = if (partsJson == null) page else MachineKind.OTHER.page
+  androidx.compose.runtime.key(url) { ExplodedWebView(url, partIds, partsJson, height) }
 }
 
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
-internal fun ExplodedView(partIds: List<String>, partsJson: String? = null) {
-  // AC uses the hand-built 3D model; any other machine is drawn from the AI's part layout.
-  val page = if (partsJson == null) "split_ac_indoor.html" else "generic.html"
+private fun ExplodedWebView(page: String, partIds: List<String>, partsJson: String?, height: androidx.compose.ui.unit.Dp) {
   val ids = partIds.joinToString(",", "[", "]") { org.json.JSONObject.quote(it) }
   val js = (if (partsJson == null) "" else "build($partsJson); ") + "highlight($ids); explode(true);"
   AndroidView(
@@ -354,7 +347,7 @@ internal fun ExplodedView(partIds: List<String>, partsJson: String? = null) {
           if (view.getTag(android.R.id.title) == true) view.evaluateJavascript(js, null)
         }
       },
-      modifier = Modifier.fillMaxWidth().height(400.dp).clip(RoundedCornerShape(10.dp)),
+      modifier = Modifier.fillMaxWidth().height(height).clip(RoundedCornerShape(10.dp)),
   )
 }
 

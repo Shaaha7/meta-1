@@ -33,6 +33,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.School
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -47,7 +49,9 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -71,6 +75,8 @@ fun CameraAccessScaffold(
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
   val snackbarHostState = remember { SnackbarHostState() }
   val bottomSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+  // Ustad hub (inspect, teach, learn, passport). Works without glasses, so it's always reachable.
+  var showUstad by remember { mutableStateOf(false) }
 
   // Observe recent errors and show snackbar
   LaunchedEffect(uiState.recentError?.id) {
@@ -119,7 +125,20 @@ fun CameraAccessScaffold(
           },
       )
 
-      if (BuildConfig.DEBUG) {
+      if (showUstad) {
+        UstadHubScreen(onClose = { showUstad = false })
+      } else {
+        ExtendedFloatingActionButton(
+            onClick = { showUstad = true },
+            icon = { Icon(Icons.Default.School, contentDescription = null) },
+            text = { Text("USTAD") },
+            modifier = Modifier.align(Alignment.CenterStart).padding(start = 12.dp),
+            containerColor = Color(0xFF39E6FF),
+            contentColor = Color(0xFF001018),
+        )
+      }
+
+      if (BuildConfig.DEBUG && !showUstad) {
         FloatingActionButton(
             onClick = { viewModel.showDebugMenu() },
             modifier = Modifier.align(Alignment.CenterEnd),

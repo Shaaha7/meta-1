@@ -1,4 +1,4 @@
-// AcExpertPanel - Expert diagnosis for machines in Ustad's knowledge base
+// ExpertPanel - Expert diagnosis for machines in Ustad's knowledge base (car, split AC, ...)
 //
 // The AI only reported what it can see; UstadBrain ranks the causes, asks the most useful next
 // question, and the fix steps come from the knowledge base with their sources. The AI is used
@@ -35,11 +35,13 @@ import com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.CoachLanguage
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.GeminiClient
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.Inspection
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.KnowledgeBase
+import com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.MachineKind
 import kotlinx.coroutines.launch
 
 @Composable
-fun AcExpertPanel(
+fun ExpertPanel(
     insp: Inspection,
+    kind: MachineKind,
     kb: KnowledgeBase,
     client: GeminiClient,
     language: CoachLanguage,
@@ -49,7 +51,11 @@ fun AcExpertPanel(
   val scope = rememberCoroutineScope()
   // Evidence: camera observations first, then the technician's answers. Error codes count as a symptom.
   var evidence by remember {
-    mutableStateOf(insp.observed.filterKeys { it in kb.symptoms } + (if (insp.errorCode.isNotBlank()) mapOf("display_error" to true) else emptyMap()))
+    // An error code on an AC display, or a fault code / warning on a car dashboard.
+    val codeSymptom = listOf("display_error", "car_check_engine").firstOrNull { it in kb.symptoms }
+    mutableStateOf(
+        insp.observed.filterKeys { it in kb.symptoms } +
+            (if (insp.errorCode.isNotBlank() && codeSymptom != null) mapOf(codeSymptom to true) else emptyMap()))
   }
   var answeredByUser by remember { mutableStateOf(setOf<String>()) }
   var skipped by remember { mutableStateOf(setOf<String>()) }
@@ -85,7 +91,7 @@ fun AcExpertPanel(
     }
   }
 
-  UstadCard("Inside view") { ExplodedView(listOf(focus.part)) }
+  UstadCard("Inside view") { ExplodedView(listOf(focus.part), page = kind.page) }
 
   UstadCard(if (confirmed != null) "Confirmed cause" else "Most likely causes") {
     (if (confirmed != null) listOf(top.copy(failure = confirmed, probability = 1.0)) else ranked.take(3)).forEachIndexed { i, r ->
