@@ -5,16 +5,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>Ustad Car 3D</title>
 <style>
-  html, body { margin: 0; height: 100%; overflow: hidden; background: #070c18; font-family: sans-serif; touch-action: none; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #060b16; font-family: sans-serif; touch-action: none; }
   canvas { display: block; }
   #labels { position: absolute; inset: 0; pointer-events: none; }
   .lbl { position: absolute; transform: translate(-50%, -100%); white-space: nowrap; font-size: 11px; color: #39e6ff;
-         background: rgba(7,12,24,.78); border: 1px solid rgba(57,230,255,.5); padding: 2px 6px; border-radius: 6px; opacity: 0; transition: opacity .5s; }
-  .lbl.fault { color: #fff; background: #ff3b30; border-color: #ff3b30; font-weight: 700; font-size: 13px; opacity: 1; z-index: 2; }
+         background: rgba(6,11,22,.8); border: 1px solid rgba(57,230,255,.5); padding: 2px 7px; border-radius: 7px; opacity: 0; transition: opacity .5s; }
+  .lbl.fault { color: #fff; background: #ff3b30; border-color: #ff3b30; font-weight: 700; font-size: 13px; opacity: 1; z-index: 2;
+               box-shadow: 0 0 14px rgba(255,59,48,.6); }
   .show .lbl { opacity: 1; }
   .dim .lbl:not(.fault) { opacity: 0 !important; }
   #hint { position: absolute; left: 10px; bottom: 8px; color: #8aa0c0; font-size: 11px; }
-  #btn { position: absolute; right: 10px; bottom: 8px; background: #39e6ff; color: #001018; border: 0; border-radius: 8px; padding: 7px 12px; font-weight: 700; font-size: 12px; }
+  #btn { position: absolute; right: 10px; bottom: 8px; background: #39e6ff; color: #001018; border: 0; border-radius: 9px; padding: 7px 13px; font-weight: 700; font-size: 12px; }
 </style>
 </head>
 <body>
@@ -27,91 +28,204 @@
 // MachineLibrary.carParts in the app. API (same as the other Ustad viewers):
 //   highlight(["c-engine"])  — red pulsing part, everything else ghosted
 //   explode(true|false)      — pull the car apart / put it back together
-// x = length (front is +x), y = up, z = width.
+//   snapshot()               — JPEG data URL of the current view (Ray-Ban Display)
+// x = length (front is +x), y = up (ground = 0), z = width.
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.body.prepend(renderer.domElement);
-const scene = new THREE.Scene(); scene.background = new THREE.Color(0x070c18); scene.fog = new THREE.Fog(0x070c18, 18, 36);
-const camera = new THREE.PerspectiveCamera(38, 1, .1, 100);
-scene.add(new THREE.HemisphereLight(0xcfe8ff, 0x1a2333, 1.2));
-const key = new THREE.DirectionalLight(0xffffff, 2.2); key.position.set(5, 8, 9); scene.add(key);
-const rim = new THREE.DirectionalLight(0x39e6ff, 1.2); rim.position.set(-8, 3, -6); scene.add(rim);
-const grid = new THREE.GridHelper(24, 24, 0x1d3b66, 0x10213d); grid.position.y = -1.3; scene.add(grid);
-const root = new THREE.Group(); root.position.y = -.4; scene.add(root);
 
-const mat = (color, o = {}) => new THREE.MeshStandardMaterial(Object.assign({ color, roughness: .45, metalness: .3, transparent: true }, o));
-const box = (w, h, d) => new THREE.BoxGeometry(w, h, d);
-const cyl = (r, h, s = 28) => new THREE.CylinderGeometry(r, r, h, s);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x060b16);
+scene.fog = new THREE.Fog(0x060b16, 16, 34);
+const camera = new THREE.PerspectiveCamera(36, 1, .1, 100);
+scene.add(new THREE.HemisphereLight(0xcfe6ff, 0x101828, 1.1));
+const key = new THREE.DirectionalLight(0xffffff, 2.6);
+key.position.set(5, 9, 6); key.castShadow = true;
+key.shadow.mapSize.set(1024, 1024);
+Object.assign(key.shadow.camera, { left: -6, right: 6, top: 6, bottom: -6, near: 1, far: 30 });
+scene.add(key);
+const rim = new THREE.DirectionalLight(0x39e6ff, 1.4); rim.position.set(-7, 3, -6); scene.add(rim);
+const fill = new THREE.DirectionalLight(0x8b7bff, .6); fill.position.set(-4, 2, 7); scene.add(fill);
 
-// Each part: id, name, meshes [geometry, material, position, rotation?], explode offset.
+const root = new THREE.Group(); root.position.y = -.55; scene.add(root);
+const grid = new THREE.GridHelper(26, 26, 0x1d3b66, 0x0f203c); root.add(grid);
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(26, 26), new THREE.ShadowMaterial({ opacity: .45 }));
+ground.rotation.x = -Math.PI / 2; ground.position.y = .002; ground.receiveShadow = true; root.add(ground);
+
+// ---------- materials and shape helpers ----------
+const std = (color, o = {}) => new THREE.MeshStandardMaterial(Object.assign({ color, roughness: .45, metalness: .35, transparent: true }, o));
+const paint = () => new THREE.MeshPhysicalMaterial({ color: 0x1d5fd6, metalness: .55, roughness: .26, clearcoat: 1, clearcoatRoughness: .08, transparent: true });
+const chrome = () => std(0xc9d2dc, { metalness: .95, roughness: .18 });
+const rubber = () => std(0x14171c, { metalness: .05, roughness: .9 });
+const darkPlastic = () => std(0x1a1f29, { metalness: .2, roughness: .6 });
+
+/** Box with rounded edges (extruded rounded rectangle). */
+function rbox(w, h, d, r = .04) {
+  r = Math.min(r, w / 2 - .001, h / 2 - .001, d / 2 - .001);
+  const s = new THREE.Shape(), x = -w / 2 + r, y = -h / 2 + r, W = w - 2 * r, H = h - 2 * r;
+  s.moveTo(x, y - r); s.lineTo(x + W, y - r); s.quadraticCurveTo(x + W + r, y - r, x + W + r, y);
+  s.lineTo(x + W + r, y + H); s.quadraticCurveTo(x + W + r, y + H + r, x + W, y + H + r);
+  s.lineTo(x, y + H + r); s.quadraticCurveTo(x - r, y + H + r, x - r, y + H); s.lineTo(x - r, y); s.quadraticCurveTo(x - r, y - r, x, y - r);
+  const g = new THREE.ExtrudeGeometry(s, { depth: d - 2 * r, bevelEnabled: true, bevelThickness: r, bevelSize: r * .6, bevelSegments: 3, curveSegments: 6 });
+  g.translate(0, 0, -(d - 2 * r) / 2); return g;
+}
+const cyl = (r, h, s = 32) => new THREE.CylinderGeometry(r, r, h, s);
+const tube = (pts, r, seg = 48) => new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts.map(p => new THREE.Vector3(...p))), seg, r, 10, false);
+class Helix extends THREE.Curve {
+  constructor(r, h, turns) { super(); this.r = r; this.h = h; this.turns = turns; }
+  getPoint(t, v = new THREE.Vector3()) { const a = t * this.turns * Math.PI * 2; return v.set(Math.cos(a) * this.r, (t - .5) * this.h, Math.sin(a) * this.r); }
+}
+function stripes(colorA, colorB, n = 48) { // radiator fins
+  const c = document.createElement('canvas'); c.width = 256; c.height = 64; const x = c.getContext('2d');
+  for (let i = 0; i < n; i++) { x.fillStyle = i % 2 ? colorA : colorB; x.fillRect(i * 256 / n, 0, 256 / n, 64); }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+
+// ---------- parts ----------
+const labelsEl = document.getElementById('labels');
 const parts = {};
 function part(id, name, meshes, out, opts = {}) {
   const g = new THREE.Group();
   meshes.forEach(([geo, m, pos, rot]) => {
-    const mesh = new THREE.Mesh(geo, m); m.userData.e0 = m.emissive.clone(); m.userData.i0 = m.emissiveIntensity; mesh.position.set(...pos); if (rot) mesh.rotation.set(...rot); g.add(mesh);
+    const mesh = new THREE.Mesh(geo, m);
+    m.userData.e0 = m.emissive ? m.emissive.clone() : null; m.userData.i0 = m.emissiveIntensity || 0; m.userData.base = m.opacity;
+    mesh.position.set(...pos); if (rot) mesh.rotation.set(...rot);
+    mesh.castShadow = true; mesh.receiveShadow = true; g.add(mesh);
   });
   const bb = new THREE.Box3().setFromObject(g);
   const el = document.createElement('div'); el.className = 'lbl'; el.textContent = name; labelsEl.appendChild(el);
   g.userData = { id, name, el, out: new THREE.Vector3(...out), shell: !!opts.shell,
-    anchor: new THREE.Vector3((bb.min.x + bb.max.x) / 2, bb.max.y + .12, (bb.min.z + bb.max.z) / 2) };
+    anchor: new THREE.Vector3((bb.min.x + bb.max.x) / 2, bb.max.y + .1, (bb.min.z + bb.max.z) / 2) };
   root.add(g); parts[id] = g;
 }
-const labelsEl = document.getElementById('labels');
 
-const paint = 0x2f6fd6, dark = 0x22262e, steel = 0x9aa3ad;
-// Body shell: lower body + cabin + glass. Ghosted when exploded so the inside is visible.
+// Body: side profile with wheel arches, extruded and bevelled; greenhouse glass; lights; mirrors.
+const WF = 1.42, WR = -1.36, WY = .4, WZ = .8; // wheel centres
+const profile = new THREE.Shape();
+profile.moveTo(-2.18, .3);
+profile.lineTo(WR - .5, .3); profile.absarc(WR, WY - .02, .48, Math.PI, 0, true);
+profile.lineTo(WF - .5, .3); profile.absarc(WF, WY - .02, .48, Math.PI, 0, true);
+profile.lineTo(2.12, .3); profile.quadraticCurveTo(2.26, .32, 2.24, .55);
+profile.quadraticCurveTo(2.22, .78, 2.05, .83);
+profile.lineTo(.82, .97); profile.quadraticCurveTo(.45, 1.22, .16, 1.38);
+profile.quadraticCurveTo(-.4, 1.46, -1.0, 1.4); profile.quadraticCurveTo(-1.45, 1.3, -1.72, 1.03);
+profile.lineTo(-2.08, .97); profile.quadraticCurveTo(-2.24, .9, -2.22, .6); profile.quadraticCurveTo(-2.22, .36, -2.18, .3);
+const bodyGeo = new THREE.ExtrudeGeometry(profile, { depth: 1.62, bevelEnabled: true, bevelThickness: .09, bevelSize: .08, bevelSegments: 5, curveSegments: 24 });
+bodyGeo.translate(0, 0, -.81);
+const glassShape = new THREE.Shape();
+glassShape.moveTo(.8, 1.0); glassShape.quadraticCurveTo(.44, 1.22, .16, 1.35); glassShape.quadraticCurveTo(-.4, 1.42, -.98, 1.37);
+glassShape.quadraticCurveTo(-1.4, 1.28, -1.66, 1.05); glassShape.lineTo(.8, 1.0);
+const glassGeo = new THREE.ExtrudeGeometry(glassShape, { depth: 1.66, bevelEnabled: true, bevelThickness: .06, bevelSize: .04, bevelSegments: 3, curveSegments: 20 });
+glassGeo.translate(0, 0, -.83);
+const glass = std(0x0b1a2c, { metalness: .9, roughness: .05, opacity: .9 });
+const headlight = () => std(0xeaf6ff, { emissive: 0xbfe6ff, emissiveIntensity: .9, metalness: .1, roughness: .1 });
+const taillight = () => std(0xff3344, { emissive: 0xff1a2a, emissiveIntensity: .8 });
 part('c-body', 'Body shell', [
-  [box(4.2, .62, 1.86), mat(paint, { metalness: .55, roughness: .3 }), [0, .72, 0]],
-  [box(2.1, .62, 1.66), mat(paint, { metalness: .55, roughness: .3 }), [-.45, 1.33, 0]],
-  [box(2.0, .5, 1.68), mat(0x9fd8ff, { opacity: .35, metalness: .1, roughness: .05 }), [-.45, 1.36, 0]],
-], [0, 2.6, 0], { shell: true });
-part('c-hood', 'Hood (bonnet)', [[box(1.25, .07, 1.8), mat(paint, { metalness: .55, roughness: .3 }), [1.55, 1.07, 0]]], [.7, 1.9, 0], { shell: true });
-part('c-bumper', 'Front bumper', [[box(.24, .42, 1.92), mat(0x1c2230), [2.2, .55, 0]]], [1.5, 0, 0], { shell: true });
-part('c-engine', 'Engine', [
-  [box(.85, .5, .8), mat(0x6b7480, { metalness: .7 }), [1.3, .62, 0]],
-  [box(.75, .16, .7), mat(0x3f4650, { metalness: .6 }), [1.3, .95, 0]],          // cylinder head
-  [cyl(.07, .7, 16), mat(0xd9a441), [1.3, 1.0, 0], [Math.PI / 2, 0, 0]],          // intake / coil rail
-  [cyl(.12, .14, 20), mat(0x2b2f36), [1.3, .58, .47], [Math.PI / 2, 0, 0]],       // alternator
-], [.2, 1.5, 0]);
-part('c-radiator', 'Radiator & coolant', [
-  [box(.09, .55, 1.3), mat(0x8c99a6, { metalness: .8 }), [1.95, .7, 0]],
-  [box(.16, .18, .2), mat(0x2bd4a8, { opacity: .85 }), [1.75, .92, -.62]],          // coolant reservoir
-], [1.0, .7, 0]);
-part('c-battery12', '12V battery', [
-  [box(.34, .24, .24), mat(0x16181d), [1.55, .86, .66]],
-  [cyl(.03, .05, 10), mat(0xff4d4d), [1.47, 1.0, .66]], [cyl(.03, .05, 10), mat(0x9aa3ad), [1.63, 1.0, .66]],
-], [.3, 1.4, 1.1]);
-part('c-gearbox', 'Transmission', [[box(.55, .4, .45), mat(0x58606b, { metalness: .7 }), [.7, .62, 0]]], [0, -.2, -1.2]);
-part('c-suspension', 'Suspension (front strut)', [
-  [cyl(.07, .55, 14), mat(0xffcc33, { metalness: .4 }), [1.4, .78, .66]],
-  [cyl(.07, .55, 14), mat(0xffcc33, { metalness: .4 }), [1.4, .78, -.66]],
-], [0, .9, 0]);
-part('c-brake', 'Brakes (disc & pads)', [
-  [cyl(.24, .04, 28), mat(0xb7bec7, { metalness: .9, roughness: .25 }), [1.4, .38, .76], [Math.PI / 2, 0, 0]],
-  [box(.14, .16, .1), mat(0xe03b3b), [1.4, .58, .76]],
-  [cyl(.24, .04, 28), mat(0xb7bec7, { metalness: .9, roughness: .25 }), [1.4, .38, -.76], [Math.PI / 2, 0, 0]],
-  [box(.14, .16, .1), mat(0xe03b3b), [1.4, .58, -.76]],
-], [0, 0, 0]);
-const tyre = () => mat(dark, { roughness: .85, metalness: .05 });
-const rimM = () => mat(steel, { metalness: .9, roughness: .25 });
-[['c-wheel-fl', 'Front-left wheel & tire', 1.4, .87, 1], ['c-wheel-fr', 'Front-right wheel & tire', 1.4, -.87, -1],
- ['c-wheel-rl', 'Rear-left wheel & tire', -1.35, .87, 1], ['c-wheel-rr', 'Rear-right wheel & tire', -1.35, -.87, -1]]
-  .forEach(([id, name, x, z, s]) => part(id, name, [
-    [cyl(.38, .26, 32), tyre(), [x, .38, z], [Math.PI / 2, 0, 0]],
-    [cyl(.22, .27, 24), rimM(), [x, .38, z], [Math.PI / 2, 0, 0]],
-  ], [0, 0, 1.3 * s]));
-part('c-hvbattery', 'High-voltage battery (EV/hybrid)', [[box(2.1, .14, 1.4), mat(0x18a0ff, { metalness: .4, emissive: 0x0a3a66, emissiveIntensity: .3 }), [-.35, .3, 0]]], [0, -1.1, 0]);
-part('c-fuel-tank', 'Fuel tank', [[box(.55, .24, 1.0), mat(0x40464f), [-1.0, .36, 0]]], [-.4, -.75, 0]);
-part('c-exhaust', 'Exhaust', [
-  [cyl(.05, 3.2, 12), mat(0x7d838a, { metalness: .8 }), [-.3, .22, -.55], [0, 0, Math.PI / 2]],
-  [cyl(.11, .45, 16), mat(0x7d838a, { metalness: .8 }), [-1.4, .22, -.55], [0, 0, Math.PI / 2]],
-], [-.6, -.5, -1.0]);
+  [bodyGeo, paint(), [0, 0, 0]],
+  [glassGeo, glass, [0, .01, 0]],
+  [rbox(.08, .1, .34, .03), headlight(), [2.2, .7, .58]], [rbox(.08, .1, .34, .03), headlight(), [2.2, .7, -.58]],
+  [rbox(.06, .1, .3, .03), taillight(), [-2.27, .82, .6]], [rbox(.06, .1, .3, .03), taillight(), [-2.27, .82, -.6]],
+  [rbox(.14, .09, .06, .02), paint(), [.62, 1.0, .95]], [rbox(.14, .09, .06, .02), paint(), [.62, 1.0, -.95]],
+  [rbox(.04, .02, 1.3, .01), chrome(), [-.42, .62, 0]], // side trim reads as a belt line through the ghosted shell
+], [0, 2.7, 0], { shell: true });
 
-// Brake discs sit inside the front wheels: when exploded they come out with the wheels, but less.
+// Hood: a curved panel matching the body line.
+const hoodShape = new THREE.Shape();
+hoodShape.moveTo(.86, .985); hoodShape.lineTo(2.03, .855); hoodShape.lineTo(2.03, .83); hoodShape.lineTo(.86, .955); hoodShape.lineTo(.86, .985);
+const hoodGeo = new THREE.ExtrudeGeometry(hoodShape, { depth: 1.5, bevelEnabled: true, bevelThickness: .05, bevelSize: .03, bevelSegments: 3 });
+hoodGeo.translate(0, .02, -.75);
+part('c-hood', 'Hood (bonnet)', [[hoodGeo, paint(), [0, 0, 0]]], [.6, 1.9, 0], { shell: true });
+
+// Front bumper with grille.
+part('c-bumper', 'Front bumper', [
+  [rbox(.24, .36, 1.9, .1), darkPlastic(), [2.2, .44, 0]],
+  [rbox(.05, .14, .9, .03), std(0x0c0f14, { metalness: .5, roughness: .3 }), [2.33, .5, 0]],
+  [rbox(.02, .03, .86, .01), chrome(), [2.36, .56, 0]],
+], [1.4, .1, 0], { shell: true });
+
+// Engine: block, head with valve cover, intake runners, pulleys and belt, alternator, oil cap.
+const runners = [-.24, -.08, .08, .24].map(z => [tube([[1.0, .7, z], [1.05, .86, z], [1.25, .9, z], [1.36, .78, z]], .035), chrome(), [0, 0, 0]]);
+part('c-engine', 'Engine', [
+  [rbox(.78, .42, .66, .06), std(0x5b6573, { metalness: .75, roughness: .35 }), [1.32, .5, 0]],
+  [rbox(.7, .13, .56, .05), std(0x8c1d22, { metalness: .5, roughness: .3 }), [1.32, .78, 0]],
+  [rbox(.24, .2, .62, .05), std(0x3c4450, { metalness: .7 }), [1.0, .7, 0]], // intake plenum
+  ...runners,
+  [cyl(.11, .05), chrome(), [1.74, .55, .18], [0, 0, Math.PI / 2]],
+  [cyl(.075, .05), chrome(), [1.74, .7, -.12], [0, 0, Math.PI / 2]],
+  [new THREE.TorusGeometry(.2, .012, 6, 40), rubber(), [1.76, .6, .03], [0, Math.PI / 2, 0]],
+  [cyl(.09, .14, 24), std(0x2a2f36, { metalness: .6 }), [1.55, .5, .42], [Math.PI / 2, 0, 0]], // alternator
+  [cyl(.04, .04, 16), std(0xf2c230, { roughness: .4 }), [1.5, .86, -.15]], // oil cap
+], [.25, 1.55, 0]);
+
+// Radiator: finned core in a frame, coolant reservoir, hoses to the engine.
+const fins = new THREE.MeshStandardMaterial({ map: stripes('#9aa6b2', '#5d6874'), metalness: .8, roughness: .35, transparent: true });
+part('c-radiator', 'Radiator & coolant', [
+  [new THREE.BoxGeometry(.05, .46, 1.22), fins, [1.98, .58, 0]],
+  [rbox(.08, .52, 1.3, .02), std(0x2a313b, { metalness: .5 }), [1.99, .58, 0], [0, 0, 0]],
+  [rbox(.16, .16, .2, .04), std(0x9ef0dd, { opacity: .8, roughness: .15, metalness: .05 }), [1.78, .8, -.58]],
+  [tube([[1.95, .78, .36], [1.85, .82, .3], [1.7, .8, .22], [1.62, .76, .2]], .03), rubber(), [0, 0, 0]],
+  [tube([[1.95, .38, -.36], [1.85, .32, -.3], [1.7, .36, -.24], [1.62, .42, -.2]], .03), rubber(), [0, 0, 0]],
+], [.95, .7, 0]);
+
+// 12V battery with red / black terminals and a label stripe.
+part('c-battery12', '12V battery', [
+  [rbox(.32, .22, .22, .03), std(0x15181e, { roughness: .5 }), [1.6, .72, .62]],
+  [rbox(.32, .03, .22, .01), std(0x39e6ff, { emissive: 0x0b4a5a, emissiveIntensity: .4 }), [1.6, .76, .62]],
+  [cyl(.03, .05, 14), std(0xe33b3b), [1.52, .86, .62]], [cyl(.03, .05, 14), std(0x23272e), [1.68, .86, .62]],
+], [.3, 1.35, 1.1]);
+
+// Transmission: bell housing (lathe) behind the engine.
+const bell = new THREE.LatheGeometry([[.05, -.26], [.2, -.24], [.25, -.1], [.24, .08], [.18, .22], [.1, .27], [.05, .28]].map(([r, y]) => new THREE.Vector2(r, y)), 32);
+part('c-gearbox', 'Transmission', [[bell, std(0x6b7480, { metalness: .8, roughness: .3 }), [.68, .48, 0], [0, 0, Math.PI / 2]]], [-.2, 1.1, -1.2]);
+
+// Front suspension: coil springs around dampers.
+const spring = new THREE.TubeGeometry(new Helix(.08, .42, 6), 120, .012, 6, false);
+part('c-suspension', 'Suspension (front strut)', [
+  [spring, std(0xffc233, { metalness: .6, roughness: .3 }), [WF, .74, .58]], [spring, std(0xffc233, { metalness: .6, roughness: .3 }), [WF, .74, -.58]],
+  [cyl(.03, .5, 12), chrome(), [WF, .74, .58]], [cyl(.03, .5, 12), chrome(), [WF, .74, -.58]],
+], [0, 1.0, 0]);
+
+// Brakes: ventilated discs with red calipers (front).
+const disc = () => std(0xb9c1ca, { metalness: .92, roughness: .28 });
+part('c-brake', 'Brakes (disc & pads)', [
+  [cyl(.22, .035, 40), disc(), [WF, WY, .66], [Math.PI / 2, 0, 0]], [rbox(.14, .14, .08, .02), std(0xd8282f, { roughness: .35 }), [WF + .02, WY + .17, .66]],
+  [cyl(.22, .035, 40), disc(), [WF, WY, -.66], [Math.PI / 2, 0, 0]], [rbox(.14, .14, .08, .02), std(0xd8282f, { roughness: .35 }), [WF + .02, WY + .17, -.66]],
+], [0, 0, 0]);
 parts['c-brake'].userData.split = [[0, 0, .8], [0, 0, .8], [0, 0, -.8], [0, 0, -.8]];
 
+// Wheels: lathe-profiled tyres, 5-spoke rims, centre caps.
+const tyre = new THREE.LatheGeometry([[.25, -.12], [.31, -.135], [.37, -.115], [.4, -.05], [.405, 0], [.4, .05], [.37, .115], [.31, .135], [.25, .12]].map(([r, y]) => new THREE.Vector2(r, y)), 48);
+function wheel(id, name, x, z, side) {
+  const meshes = [[tyre, rubber(), [x, WY, z], [Math.PI / 2, 0, 0]], [cyl(.255, .26, 40), std(0xb8c2cc, { metalness: .9, roughness: .22 }), [x, WY, z], [Math.PI / 2, 0, 0]],
+    [cyl(.06, .3, 16), chrome(), [x, WY, z], [Math.PI / 2, 0, 0]]];
+  for (let i = 0; i < 5; i++) {
+    const a = i * Math.PI * 2 / 5;
+    meshes.push([rbox(.2, .045, .03, .01), chrome(), [x + Math.cos(a) * .12, WY + Math.sin(a) * .12, z + side * .135], [0, 0, a]]);
+  }
+  part(id, name, meshes, [0, 0, 1.35 * side]);
+}
+wheel('c-wheel-fl', 'Front-left wheel & tire', WF, WZ, 1); wheel('c-wheel-fr', 'Front-right wheel & tire', WF, -WZ, -1);
+wheel('c-wheel-rl', 'Rear-left wheel & tire', WR, WZ, 1); wheel('c-wheel-rr', 'Rear-right wheel & tire', WR, -WZ, -1);
+
+// EV / hybrid high-voltage pack: tray with a grid of modules.
+const modules = [];
+for (let i = 0; i < 6; i++) for (let j = 0; j < 3; j++) modules.push([rbox(.3, .08, .38, .02), std(0x1aa3ff, { emissive: 0x093a66, emissiveIntensity: .35, metalness: .4 }), [-1.18 + i * .33, .29, -.42 + j * .42]]);
+part('c-hvbattery', 'High-voltage battery (EV/hybrid)', [[rbox(2.1, .08, 1.38, .03), std(0x2a3240, { metalness: .6 }), [-.36, .22, 0]], ...modules], [-.1, .35, 0]);
+
+// Fuel tank and exhaust (with muffler and tip).
+part('c-fuel-tank', 'Fuel tank', [[rbox(.55, .22, .95, .08), std(0x434a55, { metalness: .5 }), [-1.0, .3, .05]]], [-.3, .25, 1.4]);
+part('c-exhaust', 'Exhaust', [
+  [tube([[1.0, .34, -.32], [.6, .2, -.4], [-.2, .18, -.48], [-1.2, .2, -.5], [-2.1, .26, -.52]], .045, 80), std(0x8a9098, { metalness: .85, roughness: .3 }), [0, 0, 0]],
+  [new THREE.CapsuleGeometry(.12, .42, 6, 16), std(0x7d838a, { metalness: .85, roughness: .3 }), [-1.55, .22, -.52], [0, 0, Math.PI / 2]],
+  [cyl(.055, .14, 20), chrome(), [-2.18, .27, -.52], [0, 0, Math.PI / 2]],
+], [-.5, .2, -1.45]);
+
+// ---------- highlight / explode ----------
 let faults = [], exploded = false, explodeT = 0;
 function highlight(ids) {
   faults = (ids || []).filter(id => parts[id]);
@@ -121,53 +235,55 @@ function highlight(ids) {
     p.userData.el.classList.toggle('fault', hit);
     p.userData.el.textContent = (hit ? '⚠ ' : '') + p.userData.name;
     p.children.forEach(c => {
-      const m = c.material; m.userData.base = m.userData.base ?? m.opacity;
-      const ghost = faults.length && !hit;
-      m.opacity = ghost ? Math.min(m.userData.base, p.userData.shell ? .12 : .28) : m.userData.base;
-      m.depthWrite = !ghost; m.needsUpdate = true;
+      const m = c.material, ghost = faults.length && !hit;
+      m.opacity = ghost ? Math.min(m.userData.base, p.userData.shell ? .1 : .25) : m.userData.base;
+      m.depthWrite = !ghost; c.castShadow = !ghost; m.needsUpdate = true;
     });
   }
 }
 function explode(on) {
-  exploded = on; document.body.classList.toggle('show', on); 
+  exploded = on; document.body.classList.toggle('show', on);
   document.getElementById('btn').textContent = on ? 'Assemble' : 'Explode';
 }
 document.getElementById('btn').onclick = () => explode(!exploded);
+// Ustad lens: a still of the current 3D view for the Ray-Ban Display (labels are HTML, not in it).
+window.snapshot = () => { renderer.render(scene, camera); return renderer.domElement.toDataURL('image/jpeg', 0.8); };
 Object.assign(window, { highlight, explode, partIds: () => Object.keys(parts) });
 
-let yaw = .75, pitch = .38, dist = 11, autoSpin = true, last = null, pinch = null;
+// ---------- camera, input, animation ----------
+let yaw = .8, pitch = .34, dist = 8.2, autoSpin = true, last = null, pinch = null;
 addEventListener('pointerdown', e => { last = [e.clientX, e.clientY]; autoSpin = false; });
 addEventListener('pointerup', () => last = null);
-addEventListener('pointermove', e => { if (!last || pinch) return; yaw -= (e.clientX - last[0]) * .008; pitch = Math.max(-.1, Math.min(1.2, pitch + (e.clientY - last[1]) * .006)); last = [e.clientX, e.clientY]; });
+addEventListener('pointermove', e => { if (!last || pinch) return; yaw -= (e.clientX - last[0]) * .008; pitch = Math.max(.02, Math.min(1.2, pitch + (e.clientY - last[1]) * .006)); last = [e.clientX, e.clientY]; });
 addEventListener('touchmove', e => { if (e.touches.length !== 2) { pinch = null; return; } const [a, b] = e.touches;
-  const d = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY); if (pinch) dist = Math.max(6, Math.min(22, dist * pinch / d)); pinch = d; }, { passive: true });
+  const d = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY); if (pinch) dist = Math.max(5.5, Math.min(22, dist * pinch / d)); pinch = d; }, { passive: true });
 addEventListener('touchend', () => pinch = null);
 function resize() { renderer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); }
 addEventListener('resize', resize); resize();
 
-const clock = new THREE.Clock(), tmp = new THREE.Vector3();
+const clock = new THREE.Clock(), tmp = new THREE.Vector3(), red = new THREE.Color(1, .12, .08);
 const ease = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 (function frame() {
   const dt = Math.min(clock.getDelta(), .05), pulse = .5 + .5 * Math.sin(clock.elapsedTime * 5);
   explodeT = Math.max(0, Math.min(1, explodeT + (exploded ? dt : -dt) / 1.4)); const e = ease(explodeT);
-  if (autoSpin) yaw += dt * .16;
-  camera.position.set(Math.sin(yaw) * Math.cos(pitch) * dist, .6 + Math.sin(pitch) * dist, Math.cos(yaw) * Math.cos(pitch) * dist); camera.lookAt(0, .3, 0);
+  if (autoSpin) yaw += dt * .14;
+  camera.position.set(Math.sin(yaw) * Math.cos(pitch) * dist, .9 + Math.sin(pitch) * dist, Math.cos(yaw) * Math.cos(pitch) * dist);
+  camera.lookAt(0, .45, 0);
   for (const id in parts) {
     const p = parts[id], hit = faults.includes(id), u = p.userData;
     if (u.split) p.children.forEach((c, i) => { c.userData.home = c.userData.home || c.position.clone(); c.position.copy(c.userData.home).addScaledVector(new THREE.Vector3(...u.split[i]), e); });
     else p.position.copy(u.out).multiplyScalar(e);
-    // Shell parts fade further as the car comes apart so the inside reads clearly.
-    if (u.shell && !faults.length) p.children.forEach(c => { const b = c.material.userData.base ?? c.material.opacity; c.material.opacity = b * (1 - .55 * e); });
-    p.children.forEach(c => { const m = c.material;
-      if (hit) { m.emissive.setRGB(1, .12, .08); m.emissiveIntensity = .45 + pulse * .9; }
-      else { m.emissive.copy(m.userData.e0); m.emissiveIntensity = m.userData.i0; } });
+    if (u.shell && !faults.length) p.children.forEach(c => { c.material.opacity = c.material.userData.base * (1 - .6 * e); });
+    p.children.forEach(c => {
+      const m = c.material; if (!m.emissive) return;
+      if (hit) { m.emissive.copy(red); m.emissiveIntensity = .5 + pulse * .9; }
+      else if (m.userData.e0) { m.emissive.copy(m.userData.e0); m.emissiveIntensity = m.userData.i0; }
+    });
     tmp.copy(u.anchor).add(p.position); tmp.y += root.position.y; tmp.project(camera);
     u.el.style.left = (tmp.x * .5 + .5) * innerWidth + 'px'; u.el.style.top = (-tmp.y * .5 + .5) * innerHeight + 'px';
   }
   renderer.render(scene, camera); requestAnimationFrame(frame);
 })();
-// Ustad lens: a still of the current 3D view for the Ray-Ban Display (labels are HTML, not in it).
-window.snapshot = () => { renderer.render(scene, camera); return renderer.domElement.toDataURL('image/jpeg', 0.8); };
 </script>
 </body>
 </html>

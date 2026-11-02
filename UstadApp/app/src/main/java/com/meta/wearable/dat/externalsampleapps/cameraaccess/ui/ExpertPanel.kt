@@ -77,7 +77,6 @@ fun ExpertPanel(
   val brain = remember(brainVersion) { kb.learned(data.cases.cases(kbId), key) }
   val pastVisits = remember(brainVersion) { data.history.forMachine(key) }
   var job by remember { mutableStateOf<JobRecord?>(null) }
-  var showGraph by remember { mutableStateOf(false) }
   // Evidence: camera observations first, then the technician's answers. Error codes count as a symptom.
   var evidence by remember {
     // An error code on an AC display, or a fault code / warning on a car dashboard.
@@ -248,10 +247,6 @@ fun ExpertPanel(
             fontSize = 12.sp,
         )
       }
-      OutlinedButton(onClick = { showGraph = !showGraph }) { Text(if (showGraph) "Hide reasoning graph" else "Show reasoning graph", color = Color.White) }
-      if (showGraph) {
-        BrainGraphView(brain.reasoningGraph(evidence, ruledOut, kind.parts, focusId = focus.id).toString())
-      }
     }
 
     UstadCard("Evidence") {
@@ -282,6 +277,17 @@ fun ExpertPanel(
     }
     // The cause chain in one line; the full chain and sources are in the details.
     if (!details && focus.causeChain.isNotEmpty()) Text(focus.causeChain.joinToString("  →  "), color = Muted, fontSize = 13.sp)
+  }
+
+  // The brain's reasoning as a graph: what was seen → which causes → which part. Always visible.
+  UstadCard("🧠 How Ustad decided") {
+    BrainGraphView(brain.reasoningGraph(evidence, ruledOut, kind.parts, focusId = focus.id).toString())
+    Text(
+        if (brain.learnedCases > 0) "Green = seen, grey = not seen. Includes ${brain.learnedCases} confirmed fix(es) Ustad learned from."
+        else "Green = seen, grey = not seen, red = the leading cause and its part.",
+        color = Muted,
+        fontSize = 11.sp,
+    )
   }
 
   if (details) {
