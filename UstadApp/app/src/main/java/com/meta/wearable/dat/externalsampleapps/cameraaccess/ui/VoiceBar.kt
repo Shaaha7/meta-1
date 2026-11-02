@@ -4,6 +4,10 @@
 // the microphone opens → what the technician says becomes a command ("next", "why", "confirmed",
 // "التالي", "अगला"...) or a question for Ask Ustad → Ustad acts and speaks again. Push-to-talk
 // works too. Ustad never listens while it is speaking, so it doesn't hear itself.
+//
+// Wake-word mode: Ustad listens all the time but only acts when the technician starts with their
+// own wake word (set in the Ustad hub, e.g. "Hey Mentor, inspect"). Saying only the word makes
+// Ustad answer "Yes?" and take the next sentence as the command.
 
 package com.meta.wearable.dat.externalsampleapps.cameraaccess.ui
 
@@ -49,6 +53,17 @@ import com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.UstadVoice
 import com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.VoiceCommands
 import kotlinx.coroutines.launch
 
+/** The technician's own wake word, kept on the phone. */
+object WakeWord {
+  const val DEFAULT = "Hey Mentor"
+
+  fun get(context: Context): String =
+      context.getSharedPreferences("ustad", Context.MODE_PRIVATE).getString("wake_word", DEFAULT).orEmpty().ifBlank { DEFAULT }
+
+  fun set(context: Context, word: String) =
+      context.getSharedPreferences("ustad", Context.MODE_PRIVATE).edit().putString("wake_word", word.trim()).apply()
+}
+
 @Stable
 class VoiceLoop(private val context: Context) {
   val voice = UstadVoice(context)
@@ -57,6 +72,16 @@ class VoiceLoop(private val context: Context) {
 
   /** Keep listening after every line Ustad speaks. */
   var handsFree by mutableStateOf(false)
+  /** Always listening, acting only on sentences that start with the wake word. */
+  var wakeMode by mutableStateOf(false)
+    private set
+  /** The wake word was said on its own: the next sentence is the command. */
+  private var awaitingCommand = false
+  /** Paused by the screen (e.g. another screen is showing); wake mode resumes after. */
+  private var paused = false
+  private val main = android.os.Handler(android.os.Looper.getMainLooper())
+  val wakeWord: String
+    get() = WakeWord.get(context)
   var listening by mutableStateOf(false)
     private set
   /** Waiting for Ask Ustad's answer (don't open the mic meanwhile). */
@@ -82,13 +107,17 @@ class VoiceLoop(private val context: Context) {
     ear.stop()
     listening = false
     thinking = false
-    val ok = voice.speak(text, language) { if (handsFree) listen() }
+    val ok = voice.speak(text, language) { if (handsFree || wakeMode) listen() }
     status = if (ok) "" else "No ${language.promptName} voice on this phone (install it in Settings → Text-to-speech)"
-    if (!ok && handsFree) listen()
+    if (!ok && (handsFree || wakeMode)) listen()
     return ok
   }
 
+  private val keepListening: Boolean
+    get() = (handsFree || wakeMode) && !paused
+
   fun listen() {
+    if (paused) return
     if (!hasMic()) {
       requestPermission()
       return
@@ -101,25 +130,50 @@ class VoiceLoop(private val context: Context) {
         onText = { text ->
           listening = false
           silentTries = 0
-          heard = text
-          val h = VoiceCommands.parse(text)
-          if (h != Heard.Nothing) onHeard(h)
+          val wake = wakeWord
+          val command: String? =
+              when {
+                !wakeMode || awaitingCommand -> text
+                else -> VoiceCommands.afterWakeWord(text, wake) // null: not for Ustad
+              }
+          awaitingCommand = false
+          if (command != null) {
+            heard = text
+            if (wakeMode && command.isBlank()) {
+              awaitingCommand = true
+              say("Yes?")
+            } else {
+              val h = VoiceCommands.parse(command, wake)
+              if (h != Heard.Nothing) onHeard(h)
+            }
+          }
           // Commands that don't make Ustad speak (or noise) go straight back to listening.
-          if (handsFree && !voice.isSpeaking && !thinking && !listening) listen()
+          if (keepListening && !voice.isSpeaking && !thinking && !listening) listen()
         },
         onSilence = {
           listening = false
-          if (handsFree && ++silentTries < 3) listen()
-          else if (handsFree) {
-            handsFree = false
-            silentTries = 0
-            status = "Hands-free paused (no speech). Tap 🎙 to talk."
+          awaitingCommand = false
+          when {
+            wakeMode && !paused -> listen() // always on: keep waiting for the wake word
+            handsFree && ++silentTries < 3 -> listen()
+            handsFree -> {
+              handsFree = false
+              silentTries = 0
+              status = "Hands-free paused (no speech). Tap 🎙 to talk."
+            }
           }
         },
         onError = { message ->
           listening = false
-          handsFree = false
-          status = message
+          if (wakeMode && !paused && hasMic()) {
+            // Mic busy (e.g. recording) or a network blip: try again shortly.
+            status = message
+            main.postDelayed({ if (wakeMode && !listening && !voice.isSpeaking) listen() }, 2_000)
+          } else {
+            handsFree = false
+            wakeMode = false
+            status = message
+          }
         },
         onLevel = { level = it },
     )
@@ -128,7 +182,32 @@ class VoiceLoop(private val context: Context) {
   fun toggleHandsFree(on: Boolean) {
     handsFree = on
     silentTries = 0
-    if (on && !voice.isSpeaking) listen() else if (!on) { ear.stop(); listening = false }
+    if (on && !voice.isSpeaking) listen() else if (!on && !wakeMode) { ear.stop(); listening = false }
+  }
+
+  fun toggleWake(on: Boolean) {
+    wakeMode = on
+    awaitingCommand = false
+    if (on) {
+      status = "Say “$wakeWord” then a command."
+      if (!voice.isSpeaking && !listening) listen()
+    } else if (!handsFree) {
+      ear.stop()
+      listening = false
+    }
+  }
+
+  /** Another screen took over: stop the mic and voice, but remember the modes. */
+  fun pause() {
+    paused = true
+    ear.stop()
+    voice.stop()
+    listening = false
+  }
+
+  fun resume() {
+    paused = false
+    if (wakeMode || handsFree) listen()
   }
 
   fun toggleNatural() {
@@ -136,14 +215,18 @@ class VoiceLoop(private val context: Context) {
     UstadVoice.setNatural(context, natural)
   }
 
+  /** "Stop": Ustad goes quiet. Hands-free ends; wake-word mode keeps waiting for the word. */
   fun stopAll() {
     handsFree = false
+    awaitingCommand = false
     ear.stop()
     voice.stop()
     listening = false
+    if (wakeMode && !paused) listen()
   }
 
   fun dispose() {
+    main.removeCallbacksAndMessages(null)
     ear.stop()
     voice.shutdown()
   }
@@ -189,6 +272,10 @@ fun VoiceBar(loop: VoiceLoop, hint: String) {
             modifier = Modifier.clickable { loop.toggleNatural() }.padding(6.dp),
         )
       }
+    }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+      Text("Wake word “${loop.wakeWord}”", color = Color.White, fontSize = 13.sp, modifier = Modifier.weight(1f))
+      Switch(checked = loop.wakeMode, onCheckedChange = { loop.toggleWake(it) })
     }
     val line =
         when {

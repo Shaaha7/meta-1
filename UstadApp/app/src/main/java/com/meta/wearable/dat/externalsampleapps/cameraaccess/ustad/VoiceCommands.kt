@@ -4,12 +4,14 @@
 // from every language are always accepted because technicians mix languages mid-sentence.
 // Anything longer is a free question for "Ask Ustad" ("why do we take the negative off first?").
 // A bare number picks a quiz answer ("two", "دو", "dalawa").
+// Wake word: the technician's own word (set in the app). In wake-word mode Ustad listens all the
+// time but only acts on what follows that word ("<word>, inspect", "<word>, start lesson").
 //
 // Plain Kotlin so it is unit-testable.
 
 package com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad
 
-enum class VoiceCommand { NOT_SURE, NOT_THIS, STOP, CHECK, CONFIRMED, REPEAT, BACK, NEXT, WHY, YES, NO }
+enum class VoiceCommand { START_LESSON, STOP_LESSON, INSPECT, NOT_SURE, NOT_THIS, STOP, CHECK, CONFIRMED, REPEAT, BACK, NEXT, WHY, YES, NO }
 
 sealed interface Heard {
   data class Command(val command: VoiceCommand) : Heard
@@ -29,6 +31,21 @@ object VoiceCommands {
   // Checked in this order, so "not sure" wins over "no" and "next suspect" over "next".
   private val phrases: List<Pair<VoiceCommand, List<String>>> =
       listOf(
+          VoiceCommand.START_LESSON to
+              listOf(
+                  "start lesson", "start the lesson", "start recording", "begin lesson", "record lesson", "record",
+                  "रिकॉर्ड करो", "पाठ शुरू", "ریکارڈ کرو", "سبق شروع", "ابدا الدرس", "ابدا التسجيل", "سجل",
+                  "simulan ang aralin", "i record", "റെക്കോർഡ് ചെയ്യൂ"),
+          VoiceCommand.STOP_LESSON to
+              listOf(
+                  "stop lesson", "stop the lesson", "stop recording", "end lesson", "end the lesson", "finish lesson", "end recording",
+                  "रिकॉर्डिंग बंद", "पाठ खत्म", "ریکارڈنگ بند", "سبق ختم", "اوقف التسجيل", "انه الدرس", "انهاء الدرس",
+                  "itigil ang pag record", "tapusin ang aralin", "റെക്കോർഡിംഗ് നിർത്തൂ"),
+          VoiceCommand.INSPECT to
+              listOf(
+                  "inspect", "inspect this", "take a photo", "take photo", "take a picture", "capture", "look at this",
+                  "what's wrong", "whats wrong", "फोटो लो", "जांच करो", "تصویر لو", "صور", "التقط صورة", "شو المشكلة",
+                  "kuhanan", "litratuhan", "ഫോട്ടോ എടുക്കൂ"),
           VoiceCommand.NOT_SURE to
               listOf(
                   "not sure", "don't know", "dont know", "i don't know", "maybe", "can't see", "cannot see",
@@ -81,7 +98,23 @@ object VoiceCommands {
           listOf("3", "three", "third", "तीन", "तीसरा", "تین", "تیسرا", "ثلاثة", "ثلاث", "الثالث", "٣", "tatlo", "pangatlo", "മൂന്ന്"),
       )
 
-  private val wakeWords = listOf("hey ustad", "hi ustad", "ok ustad", "ustad", "ustaad", "يا استاذ", "استاذ", "استاد", "उस्ताद")
+  /**
+   * If [raw] starts with [wakeWord] (within the first words; "hey"/"ok" before it is fine),
+   * returns what was said after it ("" if only the word). Null when the wake word wasn't said.
+   */
+  fun afterWakeWord(raw: String, wakeWord: String): String? {
+    val wake = normalize(wakeWord)
+    if (wake.isBlank()) return null
+    val text = normalize(raw)
+    val words = text.split(' ')
+    // Allow one filler word before it ("hey", "ok", "يا").
+    for (skip in 0..1) {
+      val rest = words.drop(skip).joinToString(" ")
+      if (rest == wake) return ""
+      if (rest.startsWith("$wake ")) return rest.removePrefix(wake).trim()
+    }
+    return null
+  }
 
   /** Lower case, Arabic letter variants unified, punctuation removed, single spaces. */
   fun normalize(text: String): String =
@@ -96,9 +129,10 @@ object VoiceCommands {
 
   private fun has(text: String, phrase: String) = " $text ".contains(" ${normalize(phrase)} ")
 
-  fun parse(raw: String): Heard {
-    var text = normalize(raw)
-    wakeWords.forEach { w -> if (text.startsWith(normalize(w) + " ") || text == normalize(w)) text = text.removePrefix(normalize(w)).trim() }
+  /** [wakeWord], if given and said first, is ignored ("<word>, next" means "next"). */
+  fun parse(raw: String, wakeWord: String = ""): Heard {
+    val afterWake = afterWakeWord(raw, wakeWord)
+    val text = afterWake ?: normalize(raw)
     if (text.isBlank()) return Heard.Nothing
     val words = text.split(' ').size
     val isQuestion = raw.contains('?') || raw.contains('؟')
@@ -108,6 +142,6 @@ object VoiceCommands {
         options.forEachIndexed { i, list -> if (list.any { has(text, it) }) return Heard.Option(i) }
       }
     }
-    return if (words >= 2 || isQuestion) Heard.Question(raw.trim()) else Heard.Nothing
+    return if (words >= 2 || isQuestion) Heard.Question(afterWake ?: raw.trim()) else Heard.Nothing
   }
 }

@@ -125,9 +125,11 @@ fun CameraAccessScaffold(
           },
       )
 
+      // On the camera screen the USTAD button lives in CameraScreen, which hides it while a
+      // diagnosis or lesson is open (it used to sit on top of them).
       if (showUstad) {
         UstadHubScreen(onClose = { showUstad = false })
-      } else {
+      } else if (!uiState.isRegistered) {
         ExtendedFloatingActionButton(
             onClick = { showUstad = true },
             icon = { Icon(Icons.Default.School, contentDescription = null) },

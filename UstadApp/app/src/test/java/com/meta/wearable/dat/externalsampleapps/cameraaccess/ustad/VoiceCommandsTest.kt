@@ -24,7 +24,7 @@ class VoiceCommandsTest {
 
   @Test
   fun english() {
-    assertCommand(NEXT, "Next", "next step", "OK next.", "Hey Ustad, next")
+    assertCommand(NEXT, "Next", "next step", "OK next.")
     assertCommand(BACK, "go back", "previous")
     assertCommand(REPEAT, "repeat", "say that again", "What?")
     assertCommand(WHY, "why", "Why is that")
@@ -51,7 +51,6 @@ class VoiceCommandsTest {
     assertCommand(CONFIRMED, "مؤكد", "أكيد") // alef variants unified
     assertCommand(REPEAT, "أعد")
     assertCommand(NOT_THIS, "ليس هذا")
-    assertCommand(NEXT, "يا أستاذ التالي")
   }
 
   @Test
@@ -97,6 +96,28 @@ class VoiceCommandsTest {
   fun noiseIsIgnored() {
     assertEquals(Heard.Nothing, cmd(""))
     assertEquals(Heard.Nothing, cmd("hmm"))
-    assertEquals(Heard.Nothing, cmd("Hey Ustad"))
+  }
+
+  private val wake = "Hey Mentor"
+
+  @Test
+  fun customWakeWord() {
+    assertEquals("inspect", VoiceCommands.afterWakeWord("Hey mentor, inspect!", wake))
+    assertEquals("", VoiceCommands.afterWakeWord("hey Mentor", wake))
+    assertEquals("start lesson", VoiceCommands.afterWakeWord("OK Hey Mentor start lesson", wake)) // one filler word allowed
+    assertEquals(null, VoiceCommands.afterWakeWord("next", wake)) // not said → ignored in wake-word mode
+    assertEquals(null, VoiceCommands.afterWakeWord("the mentor said next", wake))
+    assertEquals("التالي", VoiceCommands.afterWakeWord("يا معلم التالي", "معلم"))
+    assertEquals(Heard.Command(NEXT), VoiceCommands.parse("Hey Mentor next", wake))
+    assertEquals(Heard.Nothing, VoiceCommands.parse("Hey Mentor", wake))
+    assertEquals(Heard.Question("why do we take the negative off first"), VoiceCommands.parse("Hey Mentor, why do we take the negative off first?", wake))
+  }
+
+  @Test
+  fun glassesCommands() {
+    assertCommand(VoiceCommand.INSPECT, "inspect", "take a photo", "what's wrong")
+    assertCommand(VoiceCommand.START_LESSON, "start lesson", "start recording", "ابدأ الدرس")
+    assertCommand(VoiceCommand.STOP_LESSON, "stop lesson", "stop recording", "end the lesson") // not plain "stop"
+    assertCommand(STOP, "stop")
   }
 }

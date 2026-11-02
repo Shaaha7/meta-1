@@ -58,6 +58,14 @@ object MachineLibrary {
 
 class GeminiException(message: String, val retryable: Boolean = false) : Exception(message)
 
+/** Prove-it test judged from a photo (project plan, Prompt 3: Confirm). */
+data class TestVerdict(val result: String, val reason: String, val nextAction: String) {
+  val confirmed: Boolean
+    get() = result == "CONFIRMED"
+  val notConfirmed: Boolean
+    get() = result == "NOT_CONFIRMED"
+}
+
 /** Result of checking a learner's checkpoint photo against what the step must show. */
 data class StepCheck(val pass: Boolean, val feedback: String)
 
@@ -184,6 +192,33 @@ class GeminiClient(
             .trimIndent()
     val sheet = VideoFrames.contactSheet(frames.frames)
     return parseLesson(generate(prompt, frames.frames.map { it.image }, singleImage = sheet))
+  }
+
+  /**
+   * Confirm: the technician did the prove-it test and shows the result. The AI only judges what
+   * the photo shows; when it can't tell, the answer is UNCLEAR and says what to show instead.
+   */
+  suspend fun verifyTest(photo: Bitmap, machine: String, cause: String, test: String, expected: String, language: String): TestVerdict {
+    val prompt =
+        """
+        You are Ustad. The technician did a confirmation test and photographed the result.
+        Machine: $machine
+        Suspected cause: $cause
+        Test: $test
+        Expected result if the cause is real: $expected
+
+        Decide from the photo only:
+        - CONFIRMED: the photo clearly shows the expected result.
+        - NOT_CONFIRMED: the photo clearly shows the expected result did NOT happen.
+        - UNCLEAR: the photo doesn't show the result well enough (or the result can't be seen in a
+          photo). Then next_action says exactly what to show or check again.
+        reason and next_action: max 20 words each, in $language, spoken to the technician.
+        Return ONLY JSON: {"result":"UNCLEAR","reason":"","next_action":""}
+        """
+            .trimIndent()
+    val json = generate(prompt, listOf(photo))
+    val result = json.optString("result").uppercase().replace(' ', '_').let { if (it in setOf("CONFIRMED", "NOT_CONFIRMED")) it else "UNCLEAR" }
+    return TestVerdict(result, json.optString("reason"), json.optString("next_action"))
   }
 
   /** Guide: checks a learner's checkpoint photo. Strict about safety, kind in tone. */

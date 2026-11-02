@@ -290,9 +290,18 @@ private fun HubHome(
           com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.UstadVoice.setNatural(context, natural)
         }) { Text(if (natural) "Use phone voice" else "Use natural voice", color = Color.White) }
       }
+      var wake by remember { mutableStateOf(WakeWord.get(context)) }
+      UstadField(wake, { wake = it; if (it.isNotBlank()) WakeWord.set(context, it) }, "Your wake word", singleLine = true)
       Text(
-          "Talk back: tap 🎙 or switch on Hands-free. Say “next”, “back”, “repeat”, “why”, “yes”, “no”, “not sure”, " +
-              "“confirmed”, “not this”, “stop”, in any of the six languages, or ask any question about the job.",
+          "Pick a word that's easy to say and unusual in normal talk (two words work best, in any language). " +
+              "With the wake word on, Ustad listens all the time and acts only on “$wake, …”: " +
+              "“$wake, inspect”, “$wake, start lesson”, “$wake, stop lesson”, “$wake, why?”.",
+          color = Muted,
+          fontSize = 12.sp,
+      )
+      Text(
+          "Talk back: tap 🎙, Hands-free, or the wake word. Say “next”, “back”, “repeat”, “why”, “yes”, “no”, “not sure”, " +
+              "“confirmed”, “not this”, “check”, “stop”, in any of the six languages, or ask any question about the job.",
           color = Muted,
           fontSize = 12.sp,
       )

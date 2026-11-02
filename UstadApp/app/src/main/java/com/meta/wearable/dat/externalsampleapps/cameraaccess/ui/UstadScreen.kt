@@ -91,6 +91,8 @@ fun UstadScreen(photo: Bitmap, onDismiss: () -> Unit) {
   val loop = rememberVoiceLoop()
   val voice = loop.voice
   var asked by remember { mutableStateOf<Pair<String, String>?>(null) }
+  // What the safety rules changed in the AI's repair steps.
+  var safetyFindings by remember { mutableStateOf<List<String>>(emptyList()) }
   // Ustad's expert knowledge bases, one per machine kind it knows deeply (car, split AC).
   val kbs = remember {
     MachineKind.entries.mapNotNull { k -> k.kbFile?.let { f -> runCatching { k to KnowledgeBase.load(context, f) }.getOrNull() } }.toMap()
@@ -321,12 +323,24 @@ fun UstadScreen(photo: Bitmap, onDismiss: () -> Unit) {
                       phase = Phase.LoadingSteps
                       scope.launch {
                         runCatching { client.repairSteps(insp, dx, language.promptName) }
-                            .onSuccess { steps = it; stepIndex = 0; phase = Phase.Coaching; it.firstOrNull()?.let { s -> say(s.say) } }
+                            .onSuccess {
+                              // AI steps are checked by fixed safety rules before anyone hears them.
+                              val review = com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.SafetyGuard.review(
+                                  it, "${insp.machine.type} ${insp.machine.brand} ${insp.machine.model}")
+                              steps = review.steps
+                              safetyFindings = review.findings
+                              stepIndex = 0
+                              phase = Phase.Coaching
+                              review.steps.firstOrNull()?.let { s -> say(s.say) }
+                            }
                             .onFailure { phase = Phase.Result; voiceNote = it.message ?: "Couldn't load steps" }
                       }
                     }) { Text("Start repair coach") }
                 Phase.LoadingSteps -> UstadBusy("Preparing steps in ${language.promptName}…")
                 Phase.Coaching -> {
+                  if (safetyFindings.isNotEmpty()) {
+                    Text("🛡 Safety check: " + safetyFindings.joinToString(" "), color = Color(0xFFFBBF24), fontSize = 12.sp)
+                  }
                   val s = steps.getOrNull(stepIndex)
                   if (s != null) {
                     Text("Step ${stepIndex + 1} of ${steps.size}", color = Muted, fontSize = 12.sp)

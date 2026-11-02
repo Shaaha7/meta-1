@@ -248,6 +248,12 @@ fun LessonReviewScreen(initial: Lesson, onBack: () -> Unit, onSave: (Lesson) -> 
       }
     }
 
+    // Same safety rules as live coaching: the expert sees what to fix before publishing.
+    val findings = remember(lesson) { com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.SafetyGuard.reviewLesson(lesson) }
+    if (findings.isNotEmpty()) {
+      UstadCard("🛡 Safety check", border = Fault) { findings.forEach { Text("• $it", color = Color.White, fontSize = 13.sp) } }
+    }
+
     val valid = lesson.steps.isNotEmpty() && lesson.steps.all { it.say.isNotBlank() }
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
       OutlinedButton(onClick = { onSave(lesson.copy(published = false)) }) { Text("Save draft", color = Color.White) }

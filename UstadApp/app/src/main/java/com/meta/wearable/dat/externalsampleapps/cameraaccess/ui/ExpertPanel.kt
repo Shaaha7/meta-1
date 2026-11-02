@@ -133,6 +133,38 @@ fun ExpertPanel(
     say("Confirmed. ${f.name}. Ustad will remember this.")
   }
 
+  // Prove it with a photo of the test result (project plan, Prompt 3).
+  var verdict by remember { mutableStateOf<com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.TestVerdict?>(null) }
+  var verifying by remember { mutableStateOf(false) }
+  var verifyError by remember { mutableStateOf("") }
+  val testPhoto = rememberPhotoCapture { photo ->
+    val f = top.failure
+    verifying = true
+    verifyError = ""
+    verdict = null
+    scope.launch {
+      runCatching {
+            client.verifyTest(
+                com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.PrivacyFilter.blurFaces(photo).image,
+                machineName, f.name, f.test, f.expected, language.promptName)
+          }
+          .onSuccess { v ->
+            verdict = v
+            when {
+              v.confirmed -> confirmTop()
+              v.notConfirmed -> {
+                if (ranked.size > 1) ruledOut = ruledOut + f.id
+                say("${v.reason} Not ${f.name}. Moving to the next cause.")
+              }
+              else -> say(v.nextAction.ifBlank { v.reason })
+            }
+          }
+          .onFailure { verifyError = it.message ?: "Couldn't check the photo" }
+      verifying = false
+    }
+  }
+
+
   // Voice: answer Ustad's question, prove it, coach the repair, or ask anything.
   if (loop != null) loop.onHeard = { heard ->
     val q = question
@@ -160,7 +192,8 @@ fun ExpertPanel(
             VoiceCommand.REPEAT ->
                 say(if (stepIndex in steps.indices) steps[stepIndex] else q?.question ?: "${top.failure.name}. ${top.failure.test}")
             VoiceCommand.STOP -> loop.stopAll()
-            VoiceCommand.CHECK -> Unit
+            VoiceCommand.CHECK, VoiceCommand.INSPECT -> if (confirmed == null && !verifying) testPhoto()
+            VoiceCommand.START_LESSON, VoiceCommand.STOP_LESSON -> Unit
           }
       else -> Unit
     }
@@ -262,6 +295,17 @@ fun ExpertPanel(
     UstadCard("Prove it") {
       UstadBody("🧪 ${top.failure.test}")
       Text("If it's this: ${top.failure.expected}", color = Muted, fontSize = 13.sp)
+      when {
+        verifying -> UstadBusy("Ustad is checking the test result…")
+        verifyError.isNotBlank() -> Text("Couldn't check: $verifyError", color = Muted, fontSize = 12.sp)
+        verdict != null && verdict?.confirmed != true ->
+            Text(
+                (if (verdict?.notConfirmed == true) "❌ " else "❓ ") + listOf(verdict?.reason, verdict?.nextAction).filter { !it.isNullOrBlank() }.joinToString(" "),
+                color = if (verdict?.notConfirmed == true) Fault else Color(0xFFFBBF24),
+                fontSize = 14.sp,
+            )
+      }
+      Button(onClick = { testPhoto() }, enabled = !verifying) { Text("📸 Show Ustad the result") }
       Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Button(
             onClick = { confirmTop() },

@@ -45,6 +45,7 @@ import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MicOff
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material.icons.filled.Visibility
@@ -116,6 +117,50 @@ fun CameraScreen(
   var showSettingsMenu by remember { mutableStateOf(false) }
   // Ustad: the recording being turned into a lesson (kept until the lesson flow closes).
   var lessonFromVideo by remember { mutableStateOf(false) }
+  // Ustad hub opened from the camera screen.
+  var showHub by remember { mutableStateOf(false) }
+  // Hands-free on the glasses: "<wake word>, inspect / start lesson / stop lesson".
+  val glassesVoice = rememberVoiceLoop()
+  val ustadClient = androidx.compose.runtime.remember { com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.GeminiClient() }
+  val voiceScope = androidx.compose.runtime.rememberCoroutineScope()
+  // A lesson recording started by voice opens the lesson builder as soon as it stops.
+  var voiceLesson by remember { mutableStateOf(false) }
+  val cameraFree = ui.activePreview == null && !showHub
+  androidx.compose.runtime.LaunchedEffect(cameraFree) { if (cameraFree) glassesVoice.resume() else glassesVoice.pause() }
+  androidx.compose.runtime.LaunchedEffect(ui.activePreview) {
+    if (ui.activePreview is CapturePreview.Video && voiceLesson) {
+      voiceLesson = false
+      lessonFromVideo = true
+    }
+  }
+  glassesVoice.onHeard = { heard ->
+    when (heard) {
+      is com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.Heard.Command ->
+          when (heard.command) {
+            com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.VoiceCommand.INSPECT,
+            com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.VoiceCommand.CHECK ->
+                if (ui.isStreaming) cameraViewModel.capturePhoto() else glassesVoice.say("Start the glasses preview first.")
+            com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.VoiceCommand.START_LESSON ->
+                when {
+                  !ui.isStreaming -> glassesVoice.say("Start the glasses preview first.")
+                  ui.isRecording -> glassesVoice.say("Already recording.")
+                  else -> {
+                    voiceLesson = true
+                    cameraViewModel.toggleRecording(onRequestRecordAudioPermission)
+                    glassesVoice.say("Recording the lesson. Do the job and explain as you go.")
+                  }
+                }
+            com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.VoiceCommand.STOP_LESSON ->
+                if (ui.isRecording) cameraViewModel.toggleRecording(onRequestRecordAudioPermission)
+                else glassesVoice.say("Not recording.")
+            com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.VoiceCommand.STOP -> glassesVoice.stopAll()
+            else -> Unit
+          }
+      is com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.Heard.Question ->
+          askUstad(voiceScope, ustadClient, glassesVoice, heard.text, "The technician is looking at a machine through smart glasses.") {}
+      else -> Unit
+    }
+  }
 
   val isUpdateRequired = wearablesUi.isFirmwareUpdateRequired
 
@@ -152,6 +197,12 @@ fun CameraScreen(
           },
       )
 
+      if (cameraFree) {
+        Box(Modifier.padding(horizontal = 12.dp)) {
+          VoiceBar(glassesVoice, hint = "Wake word on: “${glassesVoice.wakeWord}, inspect” · “start lesson” · “stop lesson”")
+        }
+      }
+
       Spacer(modifier = Modifier.weight(1f))
 
       BottomBar(
@@ -166,6 +217,20 @@ fun CameraScreen(
           onToggleRecording = { cameraViewModel.toggleRecording(onRequestRecordAudioPermission) },
           onToggleMic = cameraViewModel::toggleMic,
           onUpdateFirmware = { activity?.let { wearablesViewModel.openFirmwareUpdate(it) } },
+      )
+    }
+
+    // Ustad hub (inspect, teach, lessons, passport), opened from the camera screen.
+    if (showHub) {
+      UstadHubScreen(onClose = { showHub = false })
+    } else if (ui.activePreview == null) {
+      androidx.compose.material3.ExtendedFloatingActionButton(
+          onClick = { showHub = true },
+          icon = { Icon(androidx.compose.material.icons.Icons.Default.School, contentDescription = null) },
+          text = { Text("USTAD") },
+          modifier = Modifier.align(Alignment.CenterStart).padding(start = 12.dp),
+          containerColor = Color(0xFF39E6FF),
+          contentColor = Color(0xFF001018),
       )
     }
 
