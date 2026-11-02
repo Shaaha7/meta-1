@@ -75,8 +75,9 @@ fun CameraAccessScaffold(
   val uiState by viewModel.uiState.collectAsStateWithLifecycle()
   val snackbarHostState = remember { SnackbarHostState() }
   val bottomSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-  // Ustad hub (inspect, teach, learn, passport). Works without glasses, so it's always reachable.
-  var showUstad by remember { mutableStateOf(false) }
+  // Ustad hub (inspect, teach, learn, passport). The app opens straight into it; the glasses
+  // connection screens are one tap away ("Connect glasses" tile, or close the hub).
+  var showUstad by remember { mutableStateOf(true) }
 
   // Observe recent errors and show snackbar
   LaunchedEffect(uiState.recentError?.id) {

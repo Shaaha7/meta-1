@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material.icons.filled.Videocam
+import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -246,6 +247,8 @@ private fun HubHome(
     }
 
     if (tab == HubTab.INSPECT) {
+      SectionTitle("Glasses")
+      ActionTile(Icons.Default.Visibility, "Connect glasses", "Ray-Ban / Oakley Meta, or the Mock Device Kit for testing without glasses", Accent, onClick = onClose)
       SectionTitle("Find the fault")
       ActionTile(Icons.Default.PhotoCamera, "Take a photo", "Car, engine bay, AC or any machine → the failing part in 3D") { takePhoto() }
       ActionTile(Icons.Default.PhotoLibrary, "From gallery", "Use a photo you already took", Accent) { pickPhoto.launch("image/*") }
