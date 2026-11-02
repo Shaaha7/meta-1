@@ -79,7 +79,10 @@ class GeminiClient(
 ) {
 
   companion object {
-    private val FALLBACK_MODELS = listOf("gemini-3.8-flash", "gemini-flash-lite-latest")
+    private val FALLBACK_MODELS = listOf("gemini-flash-lite-latest", "gemini-2.5-flash")
+
+    /** Longest image side sent to the AI. Gemini bills/reads images in 768px tiles, so 768 = 1 tile: fastest. */
+    private const val MAX_IMAGE_SIDE = 768
     private const val BACKOFF_MS = 800L
     private const val READ_TIMEOUT_MS = 30_000
   }
@@ -92,6 +95,14 @@ class GeminiClient(
     get() = apiKey.isBlank() && openRouterKey.isBlank()
 
   private fun partList(parts: Map<String, String>) = parts.entries.joinToString("\n") { "- ${it.key}: ${it.value}" }
+
+  /** Seconds the last AI answer took (shown so slow answers can be diagnosed). */
+  @Volatile
+  var lastSeconds: Double = 0.0
+    private set
+
+  /** Models that rejected the speed setting (thinkingConfig); they are called without it. */
+  private val noThinkingConfig = java.util.Collections.synchronizedSet(mutableSetOf<String>())
 
   /** Which provider and model produced the last answer, shown to the user for transparency. */
   @Volatile
@@ -120,8 +131,9 @@ class GeminiClient(
         ${partList(MachineLibrary.acParts)}
         For any other machine use short kebab-case part ids of your own.
         If the photo is too unclear to judge, set need_better_view true and tell the user what to do.
-        For the 3D exploded view, list 6 to 10 main INTERNAL parts of this machine in
-        internal_parts (include every part_id used in diagnoses, same ids). shape is one of
+        For the 3D exploded view: if the machine is a car or a split air-conditioner, return
+        internal_parts as [] (Ustad has its own 3D model). Otherwise list 6 to 10 main INTERNAL parts
+        in internal_parts (include every part_id used in diagnoses, same ids). shape is one of
         box, cylinder, sphere, tube. size is [width,height,depth] in rough relative units 0.2-4.
         layer orders parts from outermost front (3) to innermost/back (-3). color is a realistic hex.
         If the machine is a car or a split air-conditioner, ALSO report in kb_symptoms each of
@@ -308,6 +320,8 @@ class GeminiClient(
   private suspend fun generate(prompt: String, images: List<Bitmap>, singleImage: Bitmap? = images.singleOrNull()): JSONObject =
       withContext(Dispatchers.IO) {
         if (!isConfigured) throw GeminiException("Add GEMINI_API_KEY, OPENROUTER_API_KEY or LOCAL_AI_URL to local.properties")
+        val started = System.nanoTime()
+        fun done(json: JSONObject) = json.also { lastSeconds = (System.nanoTime() - started) / 1e9 }
         val jpegs = images.map { it.toBase64Jpeg() }
         val jpeg = if (singleImage != null && images.size != 1) singleImage.toBase64Jpeg() else jpegs.singleOrNull()
         var lastError: GeminiException? = null
@@ -315,10 +329,19 @@ class GeminiClient(
         // 1) Gemini. Free-tier models often answer 503 (high demand) or 429 (rate limit), so try
         // each model once with a short backoff instead of waiting on one busy model.
         if (apiKey.isNotBlank()) {
-          val body = geminiBody(prompt, jpegs)
           for (candidate in (listOf(model) + FALLBACK_MODELS).distinct()) {
             try {
-              return@withContext callGemini(candidate, body).also { lastProvider = "Gemini · $candidate" }
+              val answer =
+                  try {
+                    callGemini(candidate, geminiBody(prompt, jpegs, thinkingFor(candidate)))
+                  } catch (e: GeminiException) {
+                    // A model that doesn't accept the speed setting: remember, call it without.
+                    if (candidate in noThinkingConfig || !e.message.orEmpty().contains("thinking", ignoreCase = true)) throw e
+                    noThinkingConfig += candidate
+                    callGemini(candidate, geminiBody(prompt, jpegs, null))
+                  }
+              lastProvider = "Gemini · $candidate"
+              return@withContext done(answer)
             } catch (e: GeminiException) {
               lastError = e
               if (!e.retryable) break
@@ -331,8 +354,9 @@ class GeminiClient(
         // supports image input and JSON output.
         if (openRouterKey.isNotBlank()) {
           try {
-            return@withContext callOpenAiCompatible(
-                "OpenRouter", "https://openrouter.ai/api/v1/chat/completions", openRouterKey, openRouterModel, prompt, jpeg)
+            return@withContext done(
+                callOpenAiCompatible(
+                    "OpenRouter", "https://openrouter.ai/api/v1/chat/completions", openRouterKey, openRouterModel, prompt, jpeg))
           } catch (e: GeminiException) {
             lastError = e
           }
@@ -342,7 +366,7 @@ class GeminiClient(
         // `adb reverse tcp:11434 tcp:11434`). Works with no internet at all.
         if (localUrl.isNotBlank()) {
           try {
-            return@withContext callOpenAiCompatible("Local", localUrl, "", localModel, prompt, jpeg)
+            return@withContext done(callOpenAiCompatible("Local", localUrl, "", localModel, prompt, jpeg))
           } catch (e: GeminiException) {
             lastError =
                 if (localOnly)
@@ -355,14 +379,32 @@ class GeminiClient(
         throw lastError ?: GeminiException("No AI provider answered")
       }
 
-  private fun geminiBody(prompt: String, jpegs: List<String>): JSONObject {
+  /**
+   * Speed: Gemini 3 models "think" before answering by default, which is what made inspection
+   * slow. Ustad's prompts are structured and the knowledge-base brain does the hard reasoning, so
+   * low thinking is enough. Gemini 3 takes thinkingLevel; Gemini 2.5 Flash takes thinkingBudget
+   * (0 = off). Setting both is an API error, so exactly one is sent.
+   */
+  private fun thinkingFor(model: String): JSONObject? =
+      when {
+        model in noThinkingConfig -> null
+        model.contains("2.5") || model.contains("2.0") -> JSONObject().put("thinkingBudget", 0)
+        else -> JSONObject().put("thinkingLevel", "low")
+      }
+
+  private fun geminiBody(prompt: String, jpegs: List<String>, thinking: JSONObject? = null): JSONObject {
     val parts = JSONArray().put(JSONObject().put("text", prompt))
     jpegs.forEach { jpeg ->
       parts.put(JSONObject().put("inline_data", JSONObject().put("mime_type", "image/jpeg").put("data", jpeg)))
     }
     return JSONObject()
         .put("contents", JSONArray().put(JSONObject().put("role", "user").put("parts", parts)))
-        .put("generationConfig", JSONObject().put("responseMimeType", "application/json").put("temperature", 0.2))
+        .put(
+            "generationConfig",
+            JSONObject().put("responseMimeType", "application/json").put("temperature", 0.2).apply {
+              if (thinking != null) put("thinkingConfig", thinking)
+            },
+        )
   }
 
   private fun callGemini(model: String, body: JSONObject): JSONObject {
@@ -453,8 +495,8 @@ class GeminiClient(
   }
 
   private fun Bitmap.toBase64Jpeg(): String {
-    // Downscale to keep uploads small and fast; 1024px on the long side is plenty for diagnosis.
-    val scale = 1024f / maxOf(width, height)
+    // Downscale to keep uploads small and fast (one 768px tile for Gemini).
+    val scale = MAX_IMAGE_SIDE.toFloat() / maxOf(width, height)
     val img = if (scale < 1f) Bitmap.createScaledBitmap(this, (width * scale).toInt(), (height * scale).toInt(), true) else this
     val out = ByteArrayOutputStream()
     img.compress(Bitmap.CompressFormat.JPEG, 85, out)

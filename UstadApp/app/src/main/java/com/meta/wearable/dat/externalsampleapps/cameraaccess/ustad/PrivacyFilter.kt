@@ -37,6 +37,13 @@ object PrivacyFilter {
     )
   }
 
+  /** Loads the face model ahead of time so the first inspection doesn't wait for it (~1 s). */
+  suspend fun warmUp() =
+      withContext(Dispatchers.Default) {
+        runCatching { detectMlKit(Bitmap.createBitmap(64, 64, Bitmap.Config.ARGB_8888)) }
+        Unit
+      }
+
   suspend fun blurFaces(source: Bitmap): PrivacyResult =
       withContext(Dispatchers.Default) {
         val boxes = runCatching { detectMlKit(source) }.onFailure { Log.w(TAG, "ML Kit failed, using fallback", it) }.getOrNull()

@@ -126,6 +126,7 @@ fun CameraScreen(
   // A lesson recording started by voice opens the lesson builder as soon as it stops.
   var voiceLesson by remember { mutableStateOf(false) }
   val cameraFree = ui.activePreview == null && !showHub
+  androidx.compose.runtime.LaunchedEffect(Unit) { com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.PrivacyFilter.warmUp() }
   androidx.compose.runtime.LaunchedEffect(cameraFree) { if (cameraFree) glassesVoice.resume() else glassesVoice.pause() }
   androidx.compose.runtime.LaunchedEffect(ui.activePreview) {
     if (ui.activePreview is CapturePreview.Video && voiceLesson) {

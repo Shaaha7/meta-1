@@ -104,6 +104,8 @@ fun UstadHubScreen(onClose: () -> Unit, initialVideo: Uri? = null) {
   var page by remember { mutableStateOf<HubPage>(initialVideo?.let { HubPage.Studio(it) } ?: HubPage.Home) }
   var refresh by remember { mutableIntStateOf(0) }
   val home = { refresh++; page = HubPage.Home }
+  // Load the on-device face model now, so the first inspection is faster.
+  androidx.compose.runtime.LaunchedEffect(Unit) { com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.PrivacyFilter.warmUp() }
 
   BackHandler(enabled = page != HubPage.Home) { home() }
   BackHandler(enabled = page == HubPage.Home) { onClose() }

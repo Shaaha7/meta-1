@@ -131,9 +131,20 @@ fun UstadScreen(photo: Bitmap, onDismiss: () -> Unit) {
   }
 
   // Privacy first, then diagnosis. Re-runs on Retry.
+  var stage by remember { mutableStateOf("") }
+  var elapsed by remember { mutableIntStateOf(0) }
+  LaunchedEffect(phase) {
+    elapsed = 0
+    while (phase == Phase.Analyzing) {
+      kotlinx.coroutines.delay(1_000)
+      elapsed++
+    }
+  }
   LaunchedEffect(attempt) {
     phase = Phase.Analyzing
+    stage = "Blurring faces on the phone…"
     val privacy = PrivacyFilter.blurFaces(photo)
+    stage = "Ustad is looking and reasoning…"
     safePhoto = privacy.image
     facesBlurred = privacy.facesBlurred
     runCatching { client.inspect(privacy.image, "", kbs.values.flatMap { it.symptoms.values }) }
@@ -179,7 +190,7 @@ fun UstadScreen(photo: Bitmap, onDismiss: () -> Unit) {
     AskUstadCard(asked)
 
     when (val p = phase) {
-      Phase.Analyzing -> UstadBusy("Ustad is looking and reasoning…")
+      Phase.Analyzing -> UstadBusy("$stage ${elapsed}s")
       is Phase.Failed ->
           UstadCard("Couldn't diagnose") {
             Text(p.message, color = Fault)
@@ -215,7 +226,12 @@ fun UstadScreen(photo: Bitmap, onDismiss: () -> Unit) {
         UstadCard("Machine") {
           Text(listOf(insp.machine.type, insp.machine.brand, insp.machine.model).filter { it.isNotBlank() }.joinToString(" · "),
               color = Color.White, fontWeight = FontWeight.Bold)
-          Text("Identified with ${(insp.machine.confidence * 100).toInt()}% confidence · ${client.lastProvider}", color = Muted, fontSize = 12.sp)
+          Text(
+              "Identified with ${(insp.machine.confidence * 100).toInt()}% confidence · ${client.lastProvider} · " +
+                  "answered in ${"%.1f".format(client.lastSeconds)} s",
+              color = Muted,
+              fontSize = 12.sp,
+          )
         }
         if (insp.symptoms.isNotEmpty()) {
           UstadCard("What I see") { insp.symptoms.forEach { UstadBody("• ${it.symptom} — ${it.location}") } }
