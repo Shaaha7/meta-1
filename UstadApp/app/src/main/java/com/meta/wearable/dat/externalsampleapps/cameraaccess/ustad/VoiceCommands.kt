@@ -11,7 +11,7 @@
 
 package com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad
 
-enum class VoiceCommand { START_LESSON, STOP_LESSON, INSPECT, NOT_SURE, NOT_THIS, STOP, CHECK, CONFIRMED, REPEAT, BACK, NEXT, WHY, YES, NO }
+enum class VoiceCommand { CALL_EXPERT, START_LESSON, STOP_LESSON, INSPECT, NOT_SURE, NOT_THIS, STOP, CHECK, CONFIRMED, REPEAT, BACK, NEXT, WHY, YES, NO }
 
 sealed interface Heard {
   data class Command(val command: VoiceCommand) : Heard
@@ -31,6 +31,10 @@ object VoiceCommands {
   // Checked in this order, so "not sure" wins over "no" and "next suspect" over "next".
   private val phrases: List<Pair<VoiceCommand, List<String>>> =
       listOf(
+          VoiceCommand.CALL_EXPERT to
+              listOf(
+                  "call expert", "call the expert", "call senior", "call my senior", "get the expert", "video call expert",
+                  "एक्सपर्ट को कॉल", "ماہر کو کال", "اتصل بالخبير", "اتصل بالمشرف", "tawagan ang eksperto", "വിദഗ്ധനെ വിളിക്കൂ"),
           VoiceCommand.START_LESSON to
               listOf(
                   "start lesson", "start the lesson", "start recording", "begin lesson", "record lesson", "record",

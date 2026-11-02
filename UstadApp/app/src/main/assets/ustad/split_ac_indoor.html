@@ -214,6 +214,8 @@ frame();
 const q = new URLSearchParams(location.search);
 highlight((q.get('parts') || '').split(',').filter(Boolean));
 setTimeout(() => explode(true), 700);
+// Ustad lens: a still of the current 3D view for the Ray-Ban Display (labels are HTML, not in it).
+window.snapshot = () => { renderer.render(scene, camera); return renderer.domElement.toDataURL('image/jpeg', 0.8); };
 </script>
 </body>
 </html>

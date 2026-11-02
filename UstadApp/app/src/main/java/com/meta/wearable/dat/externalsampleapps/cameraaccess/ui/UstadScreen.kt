@@ -37,6 +37,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -91,6 +92,8 @@ fun UstadScreen(photo: Bitmap, onDismiss: () -> Unit) {
   val loop = rememberVoiceLoop()
   val voice = loop.voice
   var asked by remember { mutableStateOf<Pair<String, String>?>(null) }
+  // What 🎧 Listen heard (machines outside the knowledge bases).
+  var heardReport by remember { mutableStateOf("") }
   // What the safety rules changed in the AI's repair steps.
   var safetyFindings by remember { mutableStateOf<List<String>>(emptyList()) }
   // Ustad's expert knowledge bases, one per machine kind it knows deeply (car, split AC).
@@ -100,7 +103,7 @@ fun UstadScreen(photo: Bitmap, onDismiss: () -> Unit) {
 
   var phase by remember { mutableStateOf<Phase>(Phase.Analyzing) }
   var safePhoto by remember { mutableStateOf(photo) }
-  var facesBlurred by remember { mutableIntStateOf(0) }
+  var privacyNote by remember { mutableStateOf("checking for faces and plates…") }
   var inspection by remember { mutableStateOf<Inspection?>(null) }
   var dxIndex by remember { mutableIntStateOf(0) }
   var confirmed by remember { mutableStateOf(false) }
@@ -146,7 +149,7 @@ fun UstadScreen(photo: Bitmap, onDismiss: () -> Unit) {
     val privacy = PrivacyFilter.blurFaces(photo)
     stage = "Ustad is looking and reasoning…"
     safePhoto = privacy.image
-    facesBlurred = privacy.facesBlurred
+    privacyNote = privacy.summary
     runCatching { client.inspect(privacy.image, "", kbs.values.flatMap { it.symptoms.values }) }
         .onSuccess {
           inspection = it
@@ -182,7 +185,7 @@ fun UstadScreen(photo: Bitmap, onDismiss: () -> Unit) {
         modifier = Modifier.fillMaxWidth().height(200.dp).clip(RoundedCornerShape(12.dp)),
     )
     Text(
-        "🔒 Captured on your command · ${if (facesBlurred > 0) "$facesBlurred face(s) blurred on device" else "no faces in frame"} · photo not stored",
+        "🔒 Captured on your command · $privacyNote · photo not stored",
         color = Ok,
         fontSize = 12.sp,
     )
@@ -205,6 +208,12 @@ fun UstadScreen(photo: Bitmap, onDismiss: () -> Unit) {
         }
         // Machines in Ustad's knowledge base are diagnosed by Ustad's own model, not the AI.
         val kind = MachineRouter.detect(insp)
+        // Lithium packs: the battery module (rule-based health model + 3D pack with the weak layer).
+        if (kind == MachineKind.BATTERY) {
+          BatteryPanel(insp, ::say)
+          if (voiceNote.isNotBlank()) Text(voiceNote, color = Muted, fontSize = 12.sp)
+          return@Column
+        }
         val kb = kbs[kind]
         if (kb != null) {
           ExpertPanel(insp, kind, kb, client, language, onLanguage = { language = it }, say = ::say, loop = loop, onAsked = { asked = it })
@@ -236,6 +245,8 @@ fun UstadScreen(photo: Bitmap, onDismiss: () -> Unit) {
         if (insp.symptoms.isNotEmpty()) {
           UstadCard("What I see") { insp.symptoms.forEach { UstadBody("• ${it.symptom} — ${it.location}") } }
         }
+        val machineLine = listOf(insp.machine.type, insp.machine.brand, insp.machine.model).filter { it.isNotBlank() }.joinToString(" ")
+        ListenCard(machineLine, emptyList(), client, language, loop) { heardReport = it.heard }
         if (insp.safety.hazard.isNotBlank() || insp.safety.stopAndCallPro) {
           UstadCard("⚠ Safety", border = Fault) {
             UstadBody(insp.safety.hazard)
@@ -253,6 +264,7 @@ fun UstadScreen(photo: Bitmap, onDismiss: () -> Unit) {
                       scope, client, loop, heard.text,
                       "Machine: ${insp.machine.type} ${insp.machine.brand} ${insp.machine.model}. Suspected: ${dx.partName}. " +
                           "Cause chain: ${dx.causeChain.joinToString(" -> ")}. Test: ${dx.confirmTest}. Safety: ${insp.safety.hazard}. " +
+                          (if (heardReport.isNotBlank()) "Sound heard: $heardReport. " else "") +
                           (steps.getOrNull(stepIndex)?.let { "Current repair step: ${it.say}" } ?: "")) { asked = it }
               is Heard.Command ->
                   when (heard.command) {
@@ -266,6 +278,8 @@ fun UstadScreen(photo: Bitmap, onDismiss: () -> Unit) {
                           insp.diagnoses.getOrNull(dxIndex)?.let { say("Next suspect: ${it.partName}. ${it.confirmTest}") }
                         }
                     VoiceCommand.STOP -> loop.stopAll()
+                    VoiceCommand.CALL_EXPERT ->
+                        say(callExpert(context, "Machine: $machineLine\nSuspected: ${dx.partName}\nTest: ${dx.confirmTest}"))
                     else -> Unit
                   }
               else -> Unit
@@ -325,6 +339,12 @@ fun UstadScreen(photo: Bitmap, onDismiss: () -> Unit) {
               Text("CONFIRMED", color = Ok, fontWeight = FontWeight.Black, fontSize = 18.sp)
             }
           }
+
+          LensMirror(
+              if (confirmed) "Fix: ${dx.partName}" else "${dx.partName} · ${(dx.confidence * 100).toInt()}%",
+              if (phase == Phase.Coaching) steps.getOrNull(stepIndex)?.say.orEmpty() else "Prove it: ${dx.confirmTest}",
+              machineLine)
+          ExpertCallCard("Machine: $machineLine\nSeen: ${insp.symptoms.joinToString { it.symptom }}\nSuspected: ${dx.partName}\nTest: ${dx.confirmTest}") { say(it) }
 
           if (confirmed) {
             UstadCard("Repair coach") {
@@ -423,7 +443,13 @@ internal fun ExplodedView(
 private fun ExplodedWebView(page: String, partIds: List<String>, partsJson: String?, height: androidx.compose.ui.unit.Dp) {
   val ids = partIds.joinToString(",", "[", "]") { org.json.JSONObject.quote(it) }
   val js = (if (partsJson == null) "" else "build($partsJson); ") + "highlight($ids); explode(true);"
-  AssetWebView(page, js, Modifier.fillMaxWidth().height(height).clip(RoundedCornerShape(10.dp)))
+  // With Ray-Ban Display glasses, the exploded view (failing part in red) also goes to the lens.
+  val toLens: (android.graphics.Bitmap) -> Unit = { b -> com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.UstadLens.showImage(b) }
+  val lens by com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.UstadLens.connected.collectAsState()
+  AssetWebView(
+      page, js, Modifier.fillMaxWidth().height(height).clip(RoundedCornerShape(10.dp)),
+      onSnapshot = if (lens) toLens else null,
+  )
 }
 
 /**
@@ -438,12 +464,35 @@ private fun ExplodedWebView(page: String, partIds: List<String>, partsJson: Stri
 internal class UstadWebView(context: android.content.Context) : WebView(context) {
   private var loaded = false
 
+  /** After each command, a still of the 3D view goes to this (used for the Ray-Ban Display). */
+  var onSnapshot: ((android.graphics.Bitmap) -> Unit)? = null
+
   var command: String = ""
     set(value) {
       if (field == value) return
       field = value
-      if (loaded && value.isNotBlank()) evaluateJavascript(value, null)
+      if (loaded && value.isNotBlank()) exec(value)
     }
+
+  private fun exec(js: String) {
+    evaluateJavascript(js, null)
+    // Let the explode animation finish, then take a still.
+    if (onSnapshot != null) postDelayed({ snapshot() }, 1_800)
+  }
+
+  private fun snapshot() {
+    val cb = onSnapshot ?: return
+    evaluateJavascript("window.snapshot ? window.snapshot() : ''") { quoted ->
+      val data = quoted?.trim('"')?.substringAfter("base64,", "").orEmpty()
+      if (data.isBlank()) return@evaluateJavascript
+      runCatching {
+            val bytes = android.util.Base64.decode(data, android.util.Base64.DEFAULT)
+            android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+          }
+          .getOrNull()
+          ?.let(cb)
+    }
+  }
 
   init {
     settings.javaScriptEnabled = true
@@ -459,7 +508,7 @@ internal class UstadWebView(context: android.content.Context) : WebView(context)
         object : WebViewClient() {
           override fun onPageFinished(view: WebView, url: String?) {
             loaded = true
-            if (command.isNotBlank()) view.evaluateJavascript(command, null)
+            if (command.isNotBlank()) exec(command)
           }
 
           // If the graphics process dies (low memory, GPU driver), drop this view instead of
@@ -475,17 +524,27 @@ internal class UstadWebView(context: android.content.Context) : WebView(context)
 }
 
 @Composable
-internal fun AssetWebView(page: String, command: String, modifier: Modifier) {
+internal fun AssetWebView(page: String, command: String, modifier: Modifier, onSnapshot: ((android.graphics.Bitmap) -> Unit)? = null) {
   AndroidView(
       factory = { ctx ->
         UstadWebView(ctx).apply {
+          this.onSnapshot = onSnapshot
           this.command = command
           loadUrl("file:///android_asset/ustad/$page")
         }
       },
-      update = { it.command = command },
+      update = {
+        it.onSnapshot = onSnapshot
+        it.command = command
+      },
       modifier = modifier,
   )
+}
+
+/** Mirrors what matters on this screen into the Ray-Ban Display lens (no-op without one). */
+@Composable
+internal fun LensMirror(title: String, body: String, meta: String = "Ustad") {
+  LaunchedEffect(title, body, meta) { com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.UstadLens.show(title, body, meta) }
 }
 
 @Composable

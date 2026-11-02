@@ -32,6 +32,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -176,6 +177,7 @@ class VoiceLoop(private val context: Context) {
           }
         },
         onLevel = { level = it },
+        quiet = wakeMode,
     )
   }
 
@@ -264,6 +266,8 @@ fun VoiceBar(loop: VoiceLoop, hint: String) {
       Text("Hands-free", color = Color.White, fontSize = 13.sp)
       Switch(checked = loop.handsFree, onCheckedChange = { loop.toggleHandsFree(it) }, modifier = Modifier.padding(start = 4.dp))
       Spacer(Modifier.weight(1f))
+      val lens by com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.UstadLens.connected.collectAsState()
+      if (lens) Text("🕶 Lens", color = Ok, fontSize = 12.sp, modifier = Modifier.padding(6.dp))
       if (UstadVoice.hasElevenLabsKey) {
         Text(
             if (loop.natural) "🗣 Natural" else "🤖 Phone",

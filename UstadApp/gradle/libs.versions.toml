@@ -11,6 +11,8 @@ testRules = "1.7.0"
 uiJunit4 = "1.11.2"
 exifInterface = "1.4.2"
 mlkitFace = "16.1.7"
+mlkitText = "16.0.1"
+mwdatDisplay = "1.0.1"
 junit = "4.13.2"
 orgJson = "20240303"
 
@@ -30,6 +32,8 @@ androidx-test-rules = { group = "androidx.test", name = "rules", version.ref = "
 androidx-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4", version.ref = "uiJunit4" }
 androidx-exifinterface = { group = "androidx.exifinterface", name = "exifinterface", version.ref = "exifInterface" }
 mlkit-face-detection = { group = "com.google.mlkit", name = "face-detection", version.ref = "mlkitFace" }
+mlkit-text-recognition = { group = "com.google.mlkit", name = "text-recognition", version.ref = "mlkitText" }
+mwdat-display = { group = "com.meta.wearable", name = "mwdat-display", version.ref = "mwdatDisplay" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 org-json = { group = "org.json", name = "json", version.ref = "orgJson" }
 

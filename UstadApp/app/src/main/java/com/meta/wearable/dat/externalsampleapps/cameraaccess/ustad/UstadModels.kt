@@ -39,6 +39,8 @@ data class Inspection(
     /** Visual symptoms the AI reported for knowledge-base machines: id → present/absent. */
     val observed: Map<String, Boolean>,
     val errorCode: String,
+    /** Numbers read off a battery label or charger screen, e.g. rated → "10Ah", health → "82%". */
+    val batteryReadings: Map<String, String> = emptyMap(),
 )
 
 data class RepairStep(
@@ -100,6 +102,10 @@ fun parseInspection(json: JSONObject): Inspection {
         }.toMap()
       } ?: emptyMap(),
       errorCode = json.optString("error_code").takeUnless { it.isNoneLike() }.orEmpty(),
+      batteryReadings =
+          json.optJSONObject("battery_readings")?.let { o ->
+            o.keys().asSequence().associateWith { o.optString(it) }.filterValues { !it.isNoneLike() }
+          } ?: emptyMap(),
   )
 }
 

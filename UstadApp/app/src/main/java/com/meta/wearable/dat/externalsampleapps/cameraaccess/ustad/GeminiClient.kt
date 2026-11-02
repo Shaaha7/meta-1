@@ -76,6 +76,9 @@ class GeminiClient(
     private val openRouterModel: String = BuildConfig.OPENROUTER_MODEL,
     private val localUrl: String = BuildConfig.LOCAL_AI_URL,
     private val localModel: String = BuildConfig.LOCAL_AI_MODEL,
+    /** Ustad backend: holds the keys; the app only sends its app token. */
+    private val backendUrl: String = BuildConfig.USTAD_BACKEND_URL.trimEnd('/'),
+    private val appToken: String = BuildConfig.USTAD_APP_TOKEN,
 ) {
 
   companion object {
@@ -87,12 +90,15 @@ class GeminiClient(
     private const val READ_TIMEOUT_MS = 30_000
   }
 
+  private val viaBackend: Boolean
+    get() = backendUrl.isNotBlank()
+
   val isConfigured: Boolean
-    get() = apiKey.isNotBlank() || openRouterKey.isNotBlank() || localUrl.isNotBlank()
+    get() = viaBackend || apiKey.isNotBlank() || openRouterKey.isNotBlank() || localUrl.isNotBlank()
 
   /** True when only the laptop's local model is set up (no cloud key in local.properties). */
   private val localOnly: Boolean
-    get() = apiKey.isBlank() && openRouterKey.isBlank()
+    get() = !viaBackend && apiKey.isBlank() && openRouterKey.isBlank()
 
   private fun partList(parts: Map<String, String>) = parts.entries.joinToString("\n") { "- ${it.key}: ${it.value}" }
 
@@ -129,6 +135,12 @@ class GeminiClient(
         ${partList(MachineLibrary.carParts)}
         If the machine is a split air-conditioner indoor unit, part_id MUST be one of:
         ${partList(MachineLibrary.acParts)}
+        If the machine is a lithium battery or battery pack (e-bike, scooter, power bank, tool,
+        storage; NOT a car's 12V battery), part_id MUST be one of:
+        ${partList(BatteryModel.parts)}
+        and ALSO report in kb_symptoms battery_swelling, battery_leak, battery_burn, battery_corrosion
+        as "present", "absent" or "unknown", and read any capacity (mAh/Ah), voltage, cycle count or
+        health % printed on it or on a charger screen into battery_readings, e.g. {"rated":"10Ah"}.
         For any other machine use short kebab-case part ids of your own.
         If the photo is too unclear to judge, set need_better_view true and tell the user what to do.
         For the 3D exploded view: if the machine is a car or a split air-conditioner, return
@@ -153,7 +165,7 @@ class GeminiClient(
                        "cause_chain":["",""],"confirm_test":"","expected_result_if_true":""}],
          "safety":{"hazard":"","stop_and_call_pro":false},
          "fault_found":true,
-         "kb_symptoms":{"water_drip":"unknown"},"error_code":"",
+         "kb_symptoms":{"water_drip":"unknown"},"error_code":"","battery_readings":{},
          "internal_parts":[{"id":"","name":"","shape":"box","size":[1,1,1],"layer":0,"color":"#8a96a3"}],
          "voice_summary":"max 25 words, spoken to the technician",
          "need_better_view":false,"user_instruction":""}
@@ -166,8 +178,17 @@ class GeminiClient(
    * Capture → Lesson: turns key frames of an expert doing a job into a draft lesson the expert
    * reviews before learners see it. [frames] must already be face-blurred.
    */
-  suspend fun buildLesson(frames: FrameSet, expertNote: String, language: String = "English"): Lesson {
+  suspend fun buildLesson(frames: FrameSet, expertNote: String, language: String = "English", audio: ExpertAudio? = null): Lesson {
     val timeline = frames.frames.mapIndexed { i, f -> "#${i + 1} at ${f.atSec}s" }.joinToString(", ")
+    val voice =
+        if (audio == null) ""
+        else
+            """
+            The recording's SOUND is attached too: the expert talking while working (${audio.seconds}s).
+            Listen to it. For each step set expert_words to what the expert actually said about it,
+            quoted in their own words and their own language (max 30 words; "" if they said nothing).
+            Use their tips and reasons in why. Never invent quotes.
+            """.trimIndent()
     val prompt =
         """
         You are Ustad, a master technician and patient teacher. The images are key frames, in
@@ -176,6 +197,7 @@ class GeminiClient(
         that will guide an APPRENTICE wearing the glasses through the same job, hands-free.
 
         Expert's note (may be empty, trust it over your guesses): "$expertNote"
+        $voice
 
         Rules:
         - Identify the machine and the job. Steps follow what the expert actually did, in order.
@@ -197,13 +219,13 @@ class GeminiClient(
 
         Return ONLY JSON:
         {"title":"","machine":"","summary":"max 30 words",
-         "steps":[{"title":"","say":"","why":"","safety":"","checkpoint":false,"must_show":"","part_id":"","at_sec":-1}],
+         "steps":[{"title":"","say":"","why":"","expert_words":"","safety":"","checkpoint":false,"must_show":"","part_id":"","at_sec":-1}],
          "quiz":[{"question":"","options":["","",""],"answer":0,"explain":""}],
          "internal_parts":[{"id":"","name":"","shape":"box","size":[1,1,1],"layer":0,"color":"#8a96a3"}]}
         """
             .trimIndent()
     val sheet = VideoFrames.contactSheet(frames.frames)
-    return parseLesson(generate(prompt, frames.frames.map { it.image }, singleImage = sheet))
+    return parseLesson(generate(prompt, frames.frames.map { it.image }, singleImage = sheet, audio = audio))
   }
 
   /**
@@ -231,6 +253,38 @@ class GeminiClient(
     val json = generate(prompt, listOf(photo))
     val result = json.optString("result").uppercase().replace(' ', '_').let { if (it in setOf("CONFIRMED", "NOT_CONFIRMED")) it else "UNCLEAR" }
     return TestVerdict(result, json.optString("reason"), json.optString("next_action"))
+  }
+
+  /**
+   * Listen: the sound of the running machine. The AI reports only the sound-related symptoms;
+   * the knowledge-base brain decides what they mean.
+   */
+  suspend fun listen(clip: WavClip, machine: String, symptoms: Collection<KbSymptom>, language: String): SoundReport {
+    val list = symptoms.joinToString("\n") { "- ${it.id}: ${it.label}" }
+    val prompt =
+        """
+        You are Ustad, an expert technician listening to a ${clip.seconds}-second recording of a
+        running machine: $machine.
+        The phone measured: ${clip.stats.describe} (loudness ${"%.0f".format(clip.stats.loudnessDb)} dBFS).
+        Judge ONLY from the sound. heard: what you hear, max 20 words, in $language, spoken to the
+        technician (e.g. "a metallic grinding that rises with speed"). abnormal: true if anything
+        sounds wrong for this machine.
+        For each symptom below report "present", "absent" or "unknown" (unknown when the sound
+        can't tell, e.g. the machine isn't running or it's too noisy):
+        $list
+        Return ONLY JSON: {"heard":"","abnormal":false,"symptoms":{"id":"unknown"}}
+        """
+            .trimIndent()
+    val json = generate(prompt, emptyList(), audio = clip)
+    val sym = json.optJSONObject("symptoms") ?: JSONObject()
+    return SoundReport(
+        heard = json.optString("heard"),
+        abnormal = json.optBoolean("abnormal", false),
+        symptoms =
+            sym.keys().asSequence().mapNotNull { k ->
+              when (sym.optString(k).lowercase()) { "present" -> k to true; "absent" -> k to false; else -> null }
+            }.filter { (k, _) -> symptoms.any { it.id == k } }.toMap(),
+    )
   }
 
   /** Guide: checks a learner's checkpoint photo. Strict about safety, kind in tone. */
@@ -317,7 +371,13 @@ class GeminiClient(
    * image; OpenAI-compatible providers (OpenRouter, local Llama) receive [singleImage] instead,
    * because many vision models there accept only one image per request.
    */
-  private suspend fun generate(prompt: String, images: List<Bitmap>, singleImage: Bitmap? = images.singleOrNull()): JSONObject =
+  private suspend fun generate(
+      prompt: String,
+      images: List<Bitmap>,
+      singleImage: Bitmap? = images.singleOrNull(),
+      /** Sound for Gemini (audio/aac or audio/wav). Other providers get the prompt and images only. */
+      audio: Any? = null,
+  ): JSONObject =
       withContext(Dispatchers.IO) {
         if (!isConfigured) throw GeminiException("Add GEMINI_API_KEY, OPENROUTER_API_KEY or LOCAL_AI_URL to local.properties")
         val started = System.nanoTime()
@@ -328,17 +388,17 @@ class GeminiClient(
 
         // 1) Gemini. Free-tier models often answer 503 (high demand) or 429 (rate limit), so try
         // each model once with a short backoff instead of waiting on one busy model.
-        if (apiKey.isNotBlank()) {
+        if (viaBackend || apiKey.isNotBlank()) {
           for (candidate in (listOf(model) + FALLBACK_MODELS).distinct()) {
             try {
               val answer =
                   try {
-                    callGemini(candidate, geminiBody(prompt, jpegs, thinkingFor(candidate)))
+                    callGemini(candidate, geminiBody(prompt, jpegs, thinkingFor(candidate), audioPart(audio)))
                   } catch (e: GeminiException) {
                     // A model that doesn't accept the speed setting: remember, call it without.
                     if (candidate in noThinkingConfig || !e.message.orEmpty().contains("thinking", ignoreCase = true)) throw e
                     noThinkingConfig += candidate
-                    callGemini(candidate, geminiBody(prompt, jpegs, null))
+                    callGemini(candidate, geminiBody(prompt, jpegs, null, audioPart(audio)))
                   }
               lastProvider = "Gemini · $candidate"
               return@withContext done(answer)
@@ -392,8 +452,19 @@ class GeminiClient(
         else -> JSONObject().put("thinkingLevel", "low")
       }
 
-  private fun geminiBody(prompt: String, jpegs: List<String>, thinking: JSONObject? = null): JSONObject {
+  private fun audioPart(audio: Any?): JSONObject? =
+      when (audio) {
+        is ExpertAudio -> inline(audio.mime, audio.bytes)
+        is WavClip -> inline("audio/wav", audio.bytes)
+        else -> null
+      }
+
+  private fun inline(mime: String, bytes: ByteArray) =
+      JSONObject().put("inline_data", JSONObject().put("mime_type", mime).put("data", Base64.encodeToString(bytes, Base64.NO_WRAP)))
+
+  private fun geminiBody(prompt: String, jpegs: List<String>, thinking: JSONObject? = null, audio: JSONObject? = null): JSONObject {
     val parts = JSONArray().put(JSONObject().put("text", prompt))
+    if (audio != null) parts.put(audio)
     jpegs.forEach { jpeg ->
       parts.put(JSONObject().put("inline_data", JSONObject().put("mime_type", "image/jpeg").put("data", jpeg)))
     }
@@ -409,12 +480,15 @@ class GeminiClient(
 
   private fun callGemini(model: String, body: JSONObject): JSONObject {
     val text =
-        post(
-            "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent",
-            mapOf("x-goog-api-key" to apiKey),
-            body,
-            "Gemini",
-        )
+        if (viaBackend)
+            post("$backendUrl/v1/gemini/$model", mapOf("X-Ustad-Token" to appToken), body, "Gemini (Ustad backend)")
+        else
+            post(
+                "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent",
+                mapOf("x-goog-api-key" to apiKey),
+                body,
+                "Gemini",
+            )
     val answer =
         JSONObject(text)
             .optJSONArray("candidates")

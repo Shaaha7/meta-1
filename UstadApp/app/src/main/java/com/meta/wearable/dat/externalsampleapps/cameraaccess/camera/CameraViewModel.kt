@@ -221,6 +221,10 @@ class CameraViewModel(
     sessionStateJob = viewModelScope.launch {
       session.state.collect { state ->
         _uiState.update { it.copy(sessionState = state) }
+        // Ustad: Ray-Ban Display glasses get Ustad in the lens; others just decline.
+        if (state == DeviceSessionState.STARTED) {
+          com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.UstadLens.attach(session)
+        }
         if (state == DeviceSessionState.STOPPED) {
           cleanupSession()
         }
@@ -237,6 +241,7 @@ class CameraViewModel(
   }
 
   private fun cleanupSession() {
+    com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.UstadLens.detach()
     sessionStateJob?.cancel()
     sessionStateJob = null
     sessionErrorJob?.cancel()

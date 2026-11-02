@@ -65,8 +65,9 @@ class UstadVoice(context: Context) {
     fun isNatural(context: Context): Boolean =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_NATURAL, true)
 
+    /** A natural voice is available: an ElevenLabs key, or the Ustad backend (which holds it). */
     val hasElevenLabsKey: Boolean
-      get() = BuildConfig.ELEVENLABS_API_KEY.isNotBlank()
+      get() = BuildConfig.ELEVENLABS_API_KEY.isNotBlank() || BuildConfig.USTAD_BACKEND_URL.isNotBlank()
   }
 
   private val appContext = context.applicationContext
@@ -99,9 +100,11 @@ class UstadVoice(context: Context) {
     )
   }
 
-  /** Speaking with the natural ElevenLabs voice right now (key set and the technician chose it). */
+  private val backend = BuildConfig.USTAD_BACKEND_URL.trimEnd('/')
+
+  /** Speaking with the natural ElevenLabs voice right now (key or backend, and the technician chose it). */
   val usesElevenLabs: Boolean
-    get() = elevenKey.isNotBlank() && isNatural(appContext)
+    get() = hasElevenLabsKey && isNatural(appContext)
 
   /** True while a line is being fetched or played. */
   var isSpeaking: Boolean = false
@@ -139,7 +142,8 @@ class UstadVoice(context: Context) {
     if (file.length() > 0) return file // cached: no credits used
 
     val url =
-        URL("https://api.elevenlabs.io/v1/text-to-speech/${BuildConfig.ELEVENLABS_VOICE_ID}?output_format=mp3_44100_128")
+        if (backend.isNotBlank()) URL("$backend/v1/tts/${BuildConfig.ELEVENLABS_VOICE_ID}?output_format=mp3_44100_128")
+        else URL("https://api.elevenlabs.io/v1/text-to-speech/${BuildConfig.ELEVENLABS_VOICE_ID}?output_format=mp3_44100_128")
     val conn =
         (url.openConnection() as HttpURLConnection).apply {
           requestMethod = "POST"
@@ -148,7 +152,8 @@ class UstadVoice(context: Context) {
           doOutput = true
           setRequestProperty("Content-Type", "application/json")
           setRequestProperty("Accept", "audio/mpeg")
-          setRequestProperty("xi-api-key", elevenKey)
+          if (backend.isNotBlank()) setRequestProperty("X-Ustad-Token", BuildConfig.USTAD_APP_TOKEN)
+          else setRequestProperty("xi-api-key", elevenKey)
         }
     try {
       val body =

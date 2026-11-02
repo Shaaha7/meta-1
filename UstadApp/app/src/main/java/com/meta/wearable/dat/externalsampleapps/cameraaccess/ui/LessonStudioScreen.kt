@@ -59,11 +59,16 @@ fun LessonStudioScreen(video: Uri, client: GeminiClient, onBack: () -> Unit, onD
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
   var frames by remember { mutableStateOf<FrameSet?>(null) }
+  // The expert's voice from the recording ("why" in their own words).
+  var audio by remember { mutableStateOf<com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.ExpertAudio?>(null) }
+  var audioChecked by remember { mutableStateOf(false) }
   var error by remember { mutableStateOf("") }
   var building by remember { mutableStateOf(false) }
   var note by remember { mutableStateOf("") }
 
   LaunchedEffect(video) {
+    audio = VideoFrames.extractAudio(context, video)
+    audioChecked = true
     runCatching { VideoFrames.extract(context, video) }
         .onSuccess { frames = it }
         .onFailure { error = it.message ?: "Couldn't read this video" }
@@ -99,11 +104,19 @@ fun LessonStudioScreen(video: Uri, client: GeminiClient, onBack: () -> Unit, onD
             }
           }
           Text(
-              "🔒 ${if (fs.facesBlurred > 0) "${fs.facesBlurred} face(s) blurred on the phone" else "No faces found"} · " +
+              "🔒 ${com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.PrivacyResult(fs.frames.first().image, fs.facesBlurred, fs.platesBlurred).summary} · " +
                   "only these still frames are sent to the AI, never the video or its audio",
               color = Ok,
               fontSize = 12.sp,
           )
+          if (audioChecked) {
+            Text(
+                audio?.let { "🎙 Expert's voice included (${it.seconds}s): Ustad quotes what you said for each step." }
+                    ?: "🎙 No sound in this video: talk while you work next time, and learners hear your reasons in your words.",
+                color = if (audio != null) Ok else Muted,
+                fontSize = 12.sp,
+            )
+          }
         }
         UstadCard("Expert's note (optional)") {
           UstadField(note, { note = it }, "e.g. Replacing the 12V battery on a 2019 Corolla")
@@ -118,7 +131,7 @@ fun LessonStudioScreen(video: Uri, client: GeminiClient, onBack: () -> Unit, onD
                 building = true
                 error = ""
                 scope.launch {
-                  runCatching { client.buildLesson(fs, note) }
+                  runCatching { client.buildLesson(fs, note, audio = audio) }
                       .onSuccess { lesson ->
                         if (lesson.steps.isEmpty()) error = lesson.summary.ifBlank { "Ustad couldn't see a clear job in this video." }
                         else onDraft(lesson.copy(published = false))
@@ -202,6 +215,7 @@ fun LessonReviewScreen(initial: Lesson, onBack: () -> Unit, onSave: (Lesson) -> 
         } else {
           UstadField(s.say, { setStep(i, s.copy(say = it)) }, "Ustad says (one action)")
           UstadField(s.why, { setStep(i, s.copy(why = it)) }, "Why it matters")
+          UstadField(s.expertWords, { setStep(i, s.copy(expertWords = it)) }, "Expert's own words (quoted from the recording)")
           UstadField(s.safety, { setStep(i, s.copy(safety = it)) }, "Safety (leave empty if none)")
           Row(verticalAlignment = Alignment.CenterVertically) {
             Text("Photo checkpoint", color = Color.White, modifier = Modifier.weight(1f))

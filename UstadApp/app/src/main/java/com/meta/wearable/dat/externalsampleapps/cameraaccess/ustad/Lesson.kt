@@ -21,6 +21,8 @@ data class LessonStep(
     val say: String,
     /** Why this step matters, the bit an apprentice usually never hears. */
     val why: String = "",
+    /** What the expert actually said about this step, in their own words (from the recording). */
+    val expertWords: String = "",
     val safety: String = "",
     /** The learner must show a photo of the result before moving on. */
     val checkpoint: Boolean = false,
@@ -61,6 +63,7 @@ fun LessonStep.toJson(): JSONObject =
         .put("title", title)
         .put("say", say)
         .put("why", why)
+        .put("expert_words", expertWords)
         .put("safety", safety)
         .put("checkpoint", checkpoint)
         .put("must_show", mustShow)
@@ -107,6 +110,7 @@ fun parseLesson(json: JSONObject, builtIn: Boolean = false): Lesson {
                 title = it.optString("title").ifBlank { say.take(40) },
                 say = say,
                 why = it.optString("why"),
+                expertWords = it.optString("expert_words"),
                 safety = it.optString("safety").takeUnless { s -> s.trim().lowercase() in setOf("none", "n/a", "") }.orEmpty(),
                 checkpoint = it.optBoolean("checkpoint", false),
                 mustShow = it.optString("must_show"),

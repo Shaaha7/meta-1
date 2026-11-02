@@ -122,10 +122,11 @@ internal fun LearnScreen(lesson: Lesson, client: GeminiClient, data: UstadData, 
 
   fun explainStep() {
     val s = shown.steps.getOrNull(stepIndex) ?: return
-    if (s.why.isBlank()) { say("There's no extra note for this step. Ask me anything about it."); return }
+    if (s.why.isBlank() && s.expertWords.isBlank()) { say("There's no extra note for this step. Ask me anything about it."); return }
     if (!showWhy) whyAsked++
     showWhy = true
-    say(s.why)
+    // The expert's own words first: that's what the apprentice would have heard on the job.
+    say(listOfNotNull(s.expertWords.takeIf { it.isNotBlank() }?.let { "The expert says: $it." }, s.why.takeIf { it.isNotBlank() }).joinToString(" "))
   }
 
   fun pickOption(oi: Int) {
@@ -153,6 +154,7 @@ internal fun LearnScreen(lesson: Lesson, client: GeminiClient, data: UstadData, 
           if (s != null && phase == LearnPhase.STEPS) {
             appendLine("Current step ${stepIndex + 1}: ${s.say}")
             if (s.why.isNotBlank()) appendLine("Why (expert's note): ${s.why}")
+            if (s.expertWords.isNotBlank()) appendLine("The expert said, in their own words: \"${s.expertWords}\"")
             if (s.safety.isNotBlank()) appendLine("Safety: ${s.safety}")
             if (s.checkpoint) appendLine("Checkpoint: the photo must show ${s.mustShow}")
           }
@@ -275,6 +277,14 @@ internal fun LearnScreen(lesson: Lesson, client: GeminiClient, data: UstadData, 
 
     VoiceBar(loop, hint = "Say “next”, “why”, “repeat”, or ask anything about this step.")
     AskUstadCard(asked)
+    LensMirror(
+        when (phase) { LearnPhase.STEPS -> "Step ${stepIndex + 1}/${shown.steps.size}"; LearnPhase.QUIZ -> "Quiz ${quizIndex + 1}/${shown.quiz.size}"; LearnPhase.DONE -> "Lesson complete" },
+        when (phase) {
+          LearnPhase.STEPS -> shown.steps.getOrNull(stepIndex)?.say.orEmpty()
+          LearnPhase.QUIZ -> shown.quiz.getOrNull(quizIndex)?.let { q -> q.question + " " + q.options.mapIndexed { i, o -> "${i + 1}) $o" }.joinToString(" ") }.orEmpty()
+          LearnPhase.DONE -> result?.let { "Score ${it.score} · ${it.level}" }.orEmpty()
+        },
+        shown.title)
 
     UstadCard("Inside view") {
       ExplodedView(
@@ -297,6 +307,9 @@ internal fun LearnScreen(lesson: Lesson, client: GeminiClient, data: UstadData, 
               )
               Text(step.say, color = Color.White, fontSize = 21.sp, fontWeight = FontWeight.SemiBold)
               if (step.safety.isNotBlank()) Text("⚠ ${step.safety}", color = Fault, fontWeight = FontWeight.SemiBold)
+              if (showWhy && step.expertWords.isNotBlank()) {
+                Text("🎙 Expert: “${step.expertWords}”", color = Color.White, modifier = Modifier.background(Color(0xFF1A2A1A), RoundedCornerShape(8.dp)).padding(8.dp))
+              }
               if (showWhy && step.why.isNotBlank()) {
                 Text("💡 ${step.why}", color = Color(0xFFFBBF24), modifier = Modifier.background(Color(0xFF11203D), RoundedCornerShape(8.dp)).padding(8.dp))
               }
@@ -321,7 +334,7 @@ internal fun LearnScreen(lesson: Lesson, client: GeminiClient, data: UstadData, 
               Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(enabled = stepIndex > 0, onClick = { stepIndex--; showWhy = false }) { Text("Back", color = Color.White) }
                 OutlinedButton(onClick = { say(step.say) }) { Text("Repeat", color = Color.White) }
-                OutlinedButton(enabled = step.why.isNotBlank(), onClick = { explainStep() }) { Text("Why?", color = Color.White) }
+                OutlinedButton(enabled = step.why.isNotBlank() || step.expertWords.isNotBlank(), onClick = { explainStep() }) { Text("Why?", color = Color.White) }
               }
               val last = stepIndex == shown.steps.lastIndex
               Button(

@@ -1,0 +1,152 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Ustad Battery 3D</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #070c18; font-family: sans-serif; touch-action: none; }
+  canvas { display: block; }
+  #labels { position: absolute; inset: 0; pointer-events: none; }
+  .lbl { position: absolute; transform: translate(-50%, -100%); white-space: nowrap; font-size: 11px; color: #39e6ff;
+         background: rgba(7,12,24,.78); border: 1px solid rgba(57,230,255,.5); padding: 2px 6px; border-radius: 6px; opacity: 0; transition: opacity .5s; }
+  .lbl.fault { color: #fff; background: #ff3b30; border-color: #ff3b30; font-weight: 700; font-size: 13px; opacity: 1; z-index: 2; }
+  .show .lbl { opacity: 1; }
+  .dim .lbl:not(.fault) { opacity: 0 !important; }
+  #hint { position: absolute; left: 10px; bottom: 8px; color: #8aa0c0; font-size: 11px; }
+  #btn { position: absolute; right: 10px; bottom: 8px; background: #39e6ff; color: #001018; border: 0; border-radius: 8px; padding: 7px 12px; font-weight: 700; font-size: 12px; }
+</style>
+</head>
+<body>
+<div id="labels"></div>
+<div id="hint">Battery pack · drag to rotate · pinch to zoom</div>
+<button id="btn">Explode</button>
+<script src="three.min.js"></script>
+<script>
+// Exploded view of a lithium battery pack. Part ids match BatteryModel.parts in the app. API (same as the other Ustad viewers):
+//   highlight(["c-engine"])  — red pulsing part, everything else ghosted
+//   explode(true|false)      — pull the car apart / put it back together
+// x = length (front is +x), y = up, z = width.
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+document.body.prepend(renderer.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x070c18); scene.fog = new THREE.Fog(0x070c18, 18, 36);
+const camera = new THREE.PerspectiveCamera(38, 1, .1, 100);
+scene.add(new THREE.HemisphereLight(0xcfe8ff, 0x1a2333, 1.2));
+const key = new THREE.DirectionalLight(0xffffff, 2.2); key.position.set(5, 8, 9); scene.add(key);
+const rim = new THREE.DirectionalLight(0x39e6ff, 1.2); rim.position.set(-8, 3, -6); scene.add(rim);
+const grid = new THREE.GridHelper(24, 24, 0x1d3b66, 0x10213d); grid.position.y = -1.3; scene.add(grid);
+const root = new THREE.Group(); root.position.y = -.6; scene.add(root);
+const cellsGroup = new THREE.Group(); root.add(cellsGroup);
+
+const mat = (color, o = {}) => new THREE.MeshStandardMaterial(Object.assign({ color, roughness: .45, metalness: .3, transparent: true }, o));
+const box = (w, h, d) => new THREE.BoxGeometry(w, h, d);
+const cyl = (r, h, s = 28) => new THREE.CylinderGeometry(r, r, h, s);
+
+// Each part: id, name, meshes [geometry, material, position, rotation?], explode offset.
+const parts = {};
+function part(id, name, meshes, out, opts = {}) {
+  const g = new THREE.Group();
+  meshes.forEach(([geo, m, pos, rot]) => {
+    const mesh = new THREE.Mesh(geo, m); m.userData.e0 = m.emissive.clone(); m.userData.i0 = m.emissiveIntensity; mesh.position.set(...pos); if (rot) mesh.rotation.set(...rot); g.add(mesh);
+  });
+  const bb = new THREE.Box3().setFromObject(g);
+  const el = document.createElement('div'); el.className = 'lbl'; el.textContent = name; labelsEl.appendChild(el);
+  g.userData = { id, name, el, out: new THREE.Vector3(...out), shell: !!opts.shell,
+    anchor: new THREE.Vector3((bb.min.x + bb.max.x) / 2, bb.max.y + .12, (bb.min.z + bb.max.z) / 2) };
+  root.add(g); parts[id] = g;
+}
+const labelsEl = document.getElementById('labels');
+
+// Battery pack: casing, 8 cells (2 x 4), BMS board, terminals. The weak cell lifts out and its
+// layers spread apart (cathode, separator, anode, electrolyte) so the failing layer can glow.
+part('b-casing', 'Pack casing', [[box(3.6, 1.25, 1.9), mat(0x3b4656, { opacity: .35, metalness: .2 }), [0, .62, 0]]], [0, 0, -1.6], { shell: true });
+const cellPos = [];
+for (let r = 0; r < 2; r++) for (let c = 0; c < 4; c++) cellPos.push([-1.2 + c * .8, .55, r ? .42 : -.42]);
+const weak = 5;
+cellPos.forEach((p, i) => {
+  if (i === weak) return;
+  const g = new THREE.Mesh(cyl(.33, 1.0, 28), mat(0x2f7d5c, { metalness: .5, roughness: .35 })); g.material.userData.base = 1; g.position.set(...p); cellsGroup.add(g);
+});
+const W = cellPos[weak];
+part('b-cell', 'Weak cell', [
+  [cyl(.335, 1.0, 28), mat(0xd9a441, { metalness: .5, roughness: .35, opacity: .9 }), W],
+  [cyl(.16, .06, 20), mat(0xb7bec7, { metalness: .9 }), [W[0], W[1] + .53, W[2]]],
+], [0, 3.0, 0]);
+// Layers of the weak cell (a jelly roll): inside the cell when assembled, spread out when exploded.
+part('b-cathode', 'Cathode', [[cyl(.29, .92, 28), mat(0x4a5a8a, { metalness: .4 }), W]], [.9, 3.0, 0]);
+part('b-separator', 'Separator', [[cyl(.25, .94, 28), mat(0xeef3f8, { opacity: .7, roughness: .9 }), W]], [1.7, 3.0, 0]);
+part('b-anode', 'Anode', [[cyl(.21, .92, 28), mat(0x8a5a3a, { metalness: .5 }), W]], [2.5, 3.0, 0]);
+part('b-electrolyte', 'Electrolyte', [[cyl(.15, .9, 24), mat(0x39b6ff, { opacity: .55, roughness: .1, emissive: 0x0a3a66, emissiveIntensity: .25 }), W]], [3.3, 3.0, 0]);
+part('b-bms', 'Battery management board (BMS)', [
+  [box(3.0, .06, 1.5), mat(0x1f7a3a, { roughness: .6 }), [0, 1.16, 0]],
+  [box(.4, .08, .3), mat(0x15181d), [-.6, 1.22, .2]], [box(.3, .08, .25), mat(0x15181d), [.5, 1.22, -.3]],
+], [0, 1.4, 0]);
+part('b-terminals', 'Terminals & connectors', [
+  [cyl(.09, .3, 14), mat(0xe03b3b), [1.45, 1.35, .55]], [cyl(.09, .3, 14), mat(0x22262e), [1.45, 1.35, -.55]],
+], [1.2, 1.6, 0]);
+
+let faults = [], exploded = false, explodeT = 0;
+let highlight = function (ids) {
+  faults = (ids || []).filter(id => parts[id]);
+  document.body.classList.toggle('dim', faults.length > 0);
+  for (const id in parts) {
+    const p = parts[id], hit = faults.includes(id);
+    p.userData.el.classList.toggle('fault', hit);
+    p.userData.el.textContent = (hit ? '⚠ ' : '') + p.userData.name;
+    p.children.forEach(c => {
+      const m = c.material; m.userData.base = m.userData.base ?? m.opacity;
+      const ghost = faults.length && !hit;
+      m.opacity = ghost ? Math.min(m.userData.base, p.userData.shell ? .12 : .28) : m.userData.base;
+      m.depthWrite = !ghost; m.needsUpdate = true;
+    });
+  }
+}
+// Healthy cells fade back whenever something is highlighted, so the weak cell and its layers stand out.
+function ghostCells() { cellsGroup.children.forEach(c => { c.material.opacity = faults.length ? .22 : 1; c.material.depthWrite = !faults.length; }); }
+function explode(on) {
+  exploded = on; document.body.classList.toggle('show', on); 
+  document.getElementById('btn').textContent = on ? 'Assemble' : 'Explode';
+}
+document.getElementById('btn').onclick = () => explode(!exploded);
+const _highlight = highlight; highlight = ids => { _highlight(ids); ghostCells(); };
+Object.assign(window, { highlight, explode, partIds: () => Object.keys(parts) });
+
+let yaw = .35, pitch = .32, dist = 12.5, autoSpin = true, last = null, pinch = null;
+addEventListener('pointerdown', e => { last = [e.clientX, e.clientY]; autoSpin = false; });
+addEventListener('pointerup', () => last = null);
+addEventListener('pointermove', e => { if (!last || pinch) return; yaw -= (e.clientX - last[0]) * .008; pitch = Math.max(-.1, Math.min(1.2, pitch + (e.clientY - last[1]) * .006)); last = [e.clientX, e.clientY]; });
+addEventListener('touchmove', e => { if (e.touches.length !== 2) { pinch = null; return; } const [a, b] = e.touches;
+  const d = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY); if (pinch) dist = Math.max(6, Math.min(22, dist * pinch / d)); pinch = d; }, { passive: true });
+addEventListener('touchend', () => pinch = null);
+function resize() { renderer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); }
+addEventListener('resize', resize); resize();
+
+const clock = new THREE.Clock(), tmp = new THREE.Vector3();
+const ease = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+(function frame() {
+  const dt = Math.min(clock.getDelta(), .05), pulse = .5 + .5 * Math.sin(clock.elapsedTime * 5);
+  explodeT = Math.max(0, Math.min(1, explodeT + (exploded ? dt : -dt) / 1.4)); const e = ease(explodeT);
+  if (autoSpin) yaw += dt * .16;
+  camera.position.set(Math.sin(yaw) * Math.cos(pitch) * dist, .6 + Math.sin(pitch) * dist, Math.cos(yaw) * Math.cos(pitch) * dist); camera.lookAt(1.1, 1.4, 0);
+  for (const id in parts) {
+    const p = parts[id], hit = faults.includes(id), u = p.userData;
+    if (u.split) p.children.forEach((c, i) => { c.userData.home = c.userData.home || c.position.clone(); c.position.copy(c.userData.home).addScaledVector(new THREE.Vector3(...u.split[i]), e); });
+    else p.position.copy(u.out).multiplyScalar(e);
+    // Shell parts fade further as the car comes apart so the inside reads clearly.
+    if (u.shell && !faults.length) p.children.forEach(c => { const b = c.material.userData.base ?? c.material.opacity; c.material.opacity = b * (1 - .55 * e); });
+    p.children.forEach(c => { const m = c.material;
+      if (hit) { m.emissive.setRGB(1, .12, .08); m.emissiveIntensity = .45 + pulse * .9; }
+      else { m.emissive.copy(m.userData.e0); m.emissiveIntensity = m.userData.i0; } });
+    tmp.copy(u.anchor).add(p.position); tmp.y += root.position.y; tmp.project(camera);
+    u.el.style.left = (tmp.x * .5 + .5) * innerWidth + 'px'; u.el.style.top = (-tmp.y * .5 + .5) * innerHeight + 'px';
+  }
+  renderer.render(scene, camera); requestAnimationFrame(frame);
+})();
+// Ustad lens: a still of the current 3D view for the Ray-Ban Display (labels are HTML, not in it).
+window.snapshot = () => { renderer.render(scene, camera); return renderer.domElement.toDataURL('image/jpeg', 0.8); };
+</script>
+</body>
+</html>

@@ -72,6 +72,8 @@ private sealed interface HubPage {
   data class Review(val lesson: Lesson) : HubPage
   data class Learn(val lesson: Lesson) : HubPage
   data object Passport : HubPage
+  data object Battery : HubPage
+  data object Dashboard : HubPage
 }
 
 /** Everything Ustad keeps on the phone. Nothing here is uploaded. */
@@ -131,6 +133,28 @@ fun UstadHubScreen(onClose: () -> Unit, initialVideo: Uri? = null) {
         )
     is HubPage.Learn -> LearnScreen(lesson = p.lesson, client = client, data = data, onExit = home)
     HubPage.Passport -> PassportScreen(data = data, onBack = home)
+    HubPage.Dashboard -> {
+      val json = remember { dashboardJson(data) }
+      Column(Modifier.fillMaxSize().background(Bg).statusBarsPadding().navigationBarsPadding()) {
+        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+          Text("TEAM DASHBOARD", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+          Spacer(Modifier.weight(1f))
+          OutlinedButton(onClick = home) { Text("Back", color = Color.White) }
+        }
+        AssetWebView("dashboard.html", "render($json);", Modifier.fillMaxWidth().weight(1f))
+      }
+    }
+    HubPage.Battery -> {
+      val loop = rememberVoiceLoop()
+      UstadPage {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+          Text("BATTERY CHECK", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+          Spacer(Modifier.weight(1f))
+          OutlinedButton(onClick = { loop.stopAll(); home() }) { Text("Back", color = Color.White) }
+        }
+        BatteryPanel(null) { loop.say(it) }
+      }
+    }
     HubPage.Home -> {
       val lessons = remember(refresh) { data.builtIns + data.store.list() }
       HubHome(
@@ -143,6 +167,8 @@ fun UstadHubScreen(onClose: () -> Unit, initialVideo: Uri? = null) {
           onEdit = { page = HubPage.Review(it) },
           onDelete = { data.store.delete(it.id); refresh++ },
           onPassport = { page = HubPage.Passport },
+          onBattery = { page = HubPage.Battery },
+          onDashboard = { page = HubPage.Dashboard },
       )
     }
   }
@@ -159,6 +185,8 @@ private fun HubHome(
     onEdit: (Lesson) -> Unit,
     onDelete: (Lesson) -> Unit,
     onPassport: () -> Unit,
+    onBattery: () -> Unit,
+    onDashboard: () -> Unit,
 ) {
   val context = LocalContext.current
   val takePhoto = rememberPhotoCapture(onInspect)
@@ -192,6 +220,12 @@ private fun HubHome(
         OutlinedButton(onClick = { pickPhoto.launch("image/*") }) { Text("From gallery", color = Color.White) }
       }
       Text("With glasses: start a session and tap capture; the photo opens here.", color = Muted, fontSize = 12.sp)
+    }
+
+    UstadCard("🔋 Battery check") {
+      UstadBody("Lithium packs (e-bike, scooter, power bank, tools, storage): health, remaining life, the weak layer in 3D, and when to isolate it.")
+      Button(onClick = onBattery) { Text("Check a battery") }
+      Text("Or just photograph the pack with Inspect: Ustad reads the label and looks for swelling.", color = Muted, fontSize = 12.sp)
     }
 
     UstadCard("🎓 Teach: expert records a job") {
@@ -237,6 +271,41 @@ private fun HubHome(
       OutlinedButton(onClick = onPassport) { Text("Open passport", color = Color.White) }
     }
 
+    UstadCard("📊 Team dashboard") {
+      var version by remember { mutableIntStateOf(0) }
+      val recordsImporter =
+          rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+            if (uri == null) return@rememberLauncherForActivityResult
+            val result =
+                runCatching {
+                  context.contentResolver.openInputStream(uri)!!.bufferedReader().use {
+                    com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.Dashboard.importRecords(it.readText(), data.passport, data.history)
+                  }
+                }
+            Toast.makeText(
+                    context,
+                    result.fold({ (p, j) -> "Added $p lesson result(s) and $j job(s)" }, { "Not an Ustad records file" }),
+                    Toast.LENGTH_SHORT)
+                .show()
+            version++
+          }
+      UstadBody("For supervisors: every technician's lessons, skill badges (score 80+), jobs and the faults you see most.")
+      Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Button(onClick = onDashboard) { Text("Open dashboard") }
+        OutlinedButton(onClick = { shareFile(context, "ustad-dashboard.html", "text/html", standaloneDashboard(context, data)) }) {
+          Text("Share", color = Color.White)
+        }
+      }
+      Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedButton(onClick = {
+          shareFile(context, "ustad-records.json", "application/json",
+              com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.Dashboard.exportRecords(data.passport, data.history))
+        }) { Text("Share my records", color = Color.White) }
+        OutlinedButton(onClick = { recordsImporter.launch("*/*") }) { Text("Import team", color = Color.White) }
+      }
+      Text("Technicians share their records; the supervisor imports them here. Nothing goes to a server.", color = Muted, fontSize = 12.sp)
+    }
+
     UstadCard("🧠 Brain & machine history") {
       var version by remember { mutableIntStateOf(0) }
       val cases = remember(version) { data.cases.all() }
@@ -279,6 +348,14 @@ private fun HubHome(
       Text("Share knowledge sends what this phone learned to another technician; Import merges theirs.", color = Muted, fontSize = 12.sp)
     }
 
+    UstadCard("📞 Your expert") {
+      var expertName by remember { mutableStateOf(ExpertContact.name(context)) }
+      var expertNumber by remember { mutableStateOf(ExpertContact.number(context)) }
+      UstadField(expertName, { expertName = it; ExpertContact.set(context, it, expertNumber) }, "Senior technician's name", singleLine = true)
+      UstadField(expertNumber, { expertNumber = it; ExpertContact.set(context, expertName, it) }, "WhatsApp number with country code (e.g. +971 50 123 4567)", singleLine = true)
+      Text("Used by “📞 Live expert” and the voice command “call expert”.", color = Muted, fontSize = 12.sp)
+    }
+
     UstadCard("🗣 Ustad's voice") {
       var natural by remember { mutableStateOf(com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.UstadVoice.isNatural(context)) }
       val hasKey = com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.UstadVoice.hasElevenLabsKey
@@ -312,11 +389,13 @@ private fun HubHome(
     UstadCard("🔒 What leaves this phone") {
       Text(
           "• Photos and video frames are taken only when you tap.\n" +
-              "• Faces are blurred ON the phone before anything is sent.\n" +
+              "• Faces and car number plates are blurred ON the phone before anything is sent.\n" +
               "• For lessons, only ~10 blurred still frames are sent, never the video or its audio.\n" +
               "• The diagnosis model for cars and ACs runs on the phone; the AI only reports what it sees.\n" +
               "• Lessons, the Skill Passport, machine history and what the brain learned stay on this phone (shared only when you tap Share).\n" +
               "• Voice: what you say is recognised on the phone when the offline language pack is installed; Ustad's spoken lines go to ElevenLabs only with the natural voice on.\n" +
+              "• 🎧 Listen sends a 6-second sound clip only when you tap it.\n" +
+              "• With the Ustad backend, the app holds no AI or voice keys at all.\n" +
               "• Offline mode: a local Llama model on the laptop, nothing goes to the internet.",
           color = Color.White,
           fontSize = 13.sp,
@@ -326,6 +405,17 @@ private fun HubHome(
 }
 
 // ---------- shared helpers for the Ustad screens ----------
+
+internal fun dashboardJson(data: UstadData): String =
+    com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.Dashboard.build(data.passport.entries(), data.history.all(), data.cases.all().size).toString()
+
+/** The dashboard as one HTML file with the data inside, for a supervisor's laptop. */
+internal fun standaloneDashboard(context: Context, data: UstadData): String {
+  val page = context.assets.open("ustad/dashboard.html").bufferedReader().use { it.readText() }
+  // "</" can't appear inside an inline script.
+  val json = dashboardJson(data).replace("</", "<\\/")
+  return page.replaceFirst("<script>", "<script>window.USTAD_DATA = $json;</script>\n<script>")
+}
 
 /** Opens the system share sheet with plain text (job reports). */
 internal fun shareText(context: Context, subject: String, text: String) {

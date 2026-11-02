@@ -11,5 +11,6 @@ Trust by design: faces are blurred on the phone before anything is sent. For car
 | Folder | What |
 |---|---|
 | [`UstadApp/`](UstadApp/README.md) | Android app (Meta Wearables Device Access Toolkit). Works with **no glasses** via the in-app USTAD hub or the Mock Device Kit |
+| [`backend/`](backend/README.md) | Tiny Node.js server that keeps the AI and voice API keys off the phones |
 | `ustad-sim/` | Browser simulation of the glasses experience |
 | `Ustad_Project_Overview.pdf` | Project overview |

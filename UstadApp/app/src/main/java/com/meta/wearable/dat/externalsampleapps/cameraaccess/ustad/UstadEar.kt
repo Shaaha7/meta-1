@@ -17,6 +17,28 @@ import android.speech.SpeechRecognizer
 class UstadEar(context: Context) {
   private val appContext = context.applicationContext
   private var recognizer: SpeechRecognizer? = null
+  private val audio = appContext.getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
+  private val main = android.os.Handler(android.os.Looper.getMainLooper())
+  private var muted = false
+
+  // The recognizer plays a short "ding" every time it starts; in always-on wake-word mode that
+  // means a beep every few seconds. These streams are muted for the moment it starts and restored
+  // as soon as it is listening. Ustad's own voice plays on the accessibility stream, not these.
+  private val beepStreams =
+      intArrayOf(android.media.AudioManager.STREAM_MUSIC, android.media.AudioManager.STREAM_NOTIFICATION, android.media.AudioManager.STREAM_SYSTEM)
+
+  private fun muteBeep() {
+    if (muted) return
+    muted = true
+    beepStreams.forEach { runCatching { audio.adjustStreamVolume(it, android.media.AudioManager.ADJUST_MUTE, 0) } }
+    main.postDelayed({ unmuteBeep() }, 1_500) // never leave the phone muted
+  }
+
+  private fun unmuteBeep() {
+    if (!muted) return
+    muted = false
+    beepStreams.forEach { runCatching { audio.adjustStreamVolume(it, android.media.AudioManager.ADJUST_UNMUTE, 0) } }
+  }
 
   val available: Boolean = SpeechRecognizer.isRecognitionAvailable(appContext)
 
@@ -30,6 +52,8 @@ class UstadEar(context: Context) {
       onSilence: () -> Unit,
       onError: (String) -> Unit,
       onLevel: (Float) -> Unit = {},
+      /** Silence the recognizer's start beep (always-on wake-word mode). */
+      quiet: Boolean = false,
   ) {
     if (!available) return onError("Speech recognition isn't available on this phone")
     stop()
@@ -37,7 +61,9 @@ class UstadEar(context: Context) {
     recognizer = r
     r.setRecognitionListener(
         object : RecognitionListener {
-          override fun onReadyForSpeech(params: Bundle?) {}
+          override fun onReadyForSpeech(params: Bundle?) {
+            main.postDelayed({ unmuteBeep() }, 250)
+          }
 
           override fun onBeginningOfSpeech() {}
 
@@ -52,12 +78,14 @@ class UstadEar(context: Context) {
           override fun onEvent(eventType: Int, params: Bundle?) {}
 
           override fun onResults(results: Bundle?) {
+            unmuteBeep()
             val text = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull().orEmpty()
             if (recognizer === r) release()
             if (text.isBlank()) onSilence() else onText(text)
           }
 
           override fun onError(error: Int) {
+            unmuteBeep()
             if (recognizer === r) release()
             when (error) {
               SpeechRecognizer.ERROR_NO_MATCH, SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> onSilence()
@@ -72,6 +100,7 @@ class UstadEar(context: Context) {
           }
         },
     )
+    if (quiet) muteBeep()
     r.startListening(
         Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
           putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
@@ -86,6 +115,7 @@ class UstadEar(context: Context) {
   fun stop() {
     recognizer?.run { runCatching { cancel() } }
     release()
+    unmuteBeep()
   }
 
   private fun release() {

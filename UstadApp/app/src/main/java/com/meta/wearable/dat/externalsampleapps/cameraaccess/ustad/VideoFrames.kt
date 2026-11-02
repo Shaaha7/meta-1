@@ -11,14 +11,23 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.media.MediaExtractor
+import android.media.MediaFormat
 import android.media.MediaMetadataRetriever
+import java.io.ByteArrayOutputStream
+import java.nio.ByteBuffer
 import android.net.Uri
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 data class KeyFrame(val atSec: Int, val image: Bitmap)
 
-data class FrameSet(val frames: List<KeyFrame>, val durationSec: Int, val facesBlurred: Int)
+/** The expert's voice from the recording, as an AAC (ADTS) stream for the AI. */
+class ExpertAudio(val bytes: ByteArray, val seconds: Int) {
+  val mime = "audio/aac"
+}
+
+data class FrameSet(val frames: List<KeyFrame>, val durationSec: Int, val facesBlurred: Int, val platesBlurred: Int = 0)
 
 object VideoFrames {
   private const val MAX_SIDE = 768
@@ -33,6 +42,7 @@ object VideoFrames {
           if (durationMs <= 0) throw IllegalArgumentException("Couldn't read this video")
           val n = count.coerceIn(2, 16)
           var faces = 0
+          var plates = 0
           val frames =
               (0 until n).mapNotNull { i ->
                 // Evenly spaced, skipping the very first/last moments (usually setup and stop).
@@ -43,12 +53,53 @@ object VideoFrames {
                         ?: return@mapNotNull null
                 val safe = PrivacyFilter.blurFaces(raw)
                 faces += safe.facesBlurred
+                plates += safe.platesBlurred
                 KeyFrame((tMs / 1000).toInt(), safe.image)
               }
           if (frames.isEmpty()) throw IllegalArgumentException("Couldn't read frames from this video")
-          FrameSet(frames, (durationMs / 1000).toInt(), faces)
+          FrameSet(frames, (durationMs / 1000).toInt(), faces, plates)
         } finally {
           runCatching { retriever.release() }
+        }
+      }
+
+  /**
+   * The video's sound track (the expert explaining while working), up to [maxSec] seconds, as
+   * ADTS AAC. Null when the video has no AAC sound (e.g. recorded with sound off).
+   */
+  suspend fun extractAudio(context: Context, uri: Uri, maxSec: Int = 300): ExpertAudio? =
+      withContext(Dispatchers.IO) {
+        val ex = MediaExtractor()
+        try {
+          ex.setDataSource(context, uri, null)
+          val track = (0 until ex.trackCount).firstOrNull {
+            ex.getTrackFormat(it).getString(MediaFormat.KEY_MIME) == MediaFormat.MIMETYPE_AUDIO_AAC
+          } ?: return@withContext null
+          val format = ex.getTrackFormat(track)
+          val rate = format.getInteger(MediaFormat.KEY_SAMPLE_RATE)
+          val channels = format.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
+          val profile = if (format.containsKey(MediaFormat.KEY_AAC_PROFILE)) format.getInteger(MediaFormat.KEY_AAC_PROFILE) else 2
+          ex.selectTrack(track)
+          val out = ByteArrayOutputStream()
+          val buffer = ByteBuffer.allocate(64 * 1024)
+          val frame = ByteArray(64 * 1024)
+          var lastUs = 0L
+          while (true) {
+            val size = ex.readSampleData(buffer, 0)
+            if (size < 0) break
+            lastUs = ex.sampleTime
+            if (lastUs > maxSec * 1_000_000L) break
+            buffer.get(frame, 0, size)
+            buffer.clear()
+            out.write(Adts.header(size, profile, rate, channels))
+            out.write(frame, 0, size)
+            ex.advance()
+          }
+          if (out.size() == 0) null else ExpertAudio(out.toByteArray(), (lastUs / 1_000_000).toInt())
+        } catch (e: Exception) {
+          null
+        } finally {
+          runCatching { ex.release() }
         }
       }
 

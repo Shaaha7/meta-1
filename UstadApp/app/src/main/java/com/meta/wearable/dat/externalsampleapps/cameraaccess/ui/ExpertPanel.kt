@@ -85,6 +85,8 @@ fun ExpertPanel(
             (if (insp.errorCode.isNotBlank() && codeSymptom != null) mapOf(codeSymptom to true) else emptyMap()))
   }
   var answeredByUser by remember { mutableStateOf(setOf<String>()) }
+  // Symptoms judged by ear (🎧 Listen).
+  var heardByEar by remember { mutableStateOf(setOf<String>()) }
   var skipped by remember { mutableStateOf(setOf<String>()) }
   var ruledOut by remember { mutableStateOf(setOf<String>()) }
   var confirmedId by remember { mutableStateOf<String?>(null) }
@@ -105,6 +107,12 @@ fun ExpertPanel(
       job = j.copy(steps = steps, completed = true).also { data.history.save(it) }
     }
   }
+
+  fun expertSummary() =
+      "Machine: $machineName\n" +
+          "Seen: " + evidence.entries.joinToString(", ") { (id, p) -> "${if (p) "" else "no "}${kb.symptoms[id]?.label ?: id}" } + "\n" +
+          "Ustad thinks: ${focus.name} (${(top.probability * 100).toInt()}%)\n" +
+          "Test: ${focus.test}"
 
   /** The prove-it test passed: Ustad learns from this case and the visit goes into the history. */
   fun confirmTop() {
@@ -193,6 +201,7 @@ fun ExpertPanel(
                 say(if (stepIndex in steps.indices) steps[stepIndex] else q?.question ?: "${top.failure.name}. ${top.failure.test}")
             VoiceCommand.STOP -> loop.stopAll()
             VoiceCommand.CHECK, VoiceCommand.INSPECT -> if (confirmed == null && !verifying) testPhoto()
+            VoiceCommand.CALL_EXPERT -> say(callExpert(context, expertSummary()))
             VoiceCommand.START_LESSON, VoiceCommand.STOP_LESSON -> Unit
           }
       else -> Unit
@@ -242,8 +251,17 @@ fun ExpertPanel(
     if (evidence.isEmpty()) UstadBody("Nothing conclusive seen yet. Answer the questions below.")
     evidence.forEach { (id, present) ->
       val s = kb.symptoms[id] ?: return@forEach
-      Text("${if (present) "✓" else "✗"} ${s.label}  ·  ${if (id in answeredByUser) "you" else "camera"}",
+      Text("${if (present) "✓" else "✗"} ${s.label}  ·  ${when (id) { in answeredByUser -> "you"; in heardByEar -> "ears"; else -> "camera" }}",
           color = if (present) Color.White else Muted, fontSize = 14.sp)
+    }
+  }
+
+  if (confirmed == null) {
+    ListenCard(machineName, kb.symptoms.values, client, language, loop) { report ->
+      // What was heard goes into the evidence (answers the technician gave by hand win).
+      val fromEar = report.symptoms.filterKeys { it in kb.symptoms && it !in answeredByUser }
+      evidence = evidence + fromEar
+      heardByEar = heardByEar + fromEar.keys
     }
   }
 
@@ -279,6 +297,17 @@ fun ExpertPanel(
   }
 
   if (focus.safety.isNotBlank()) UstadCard("⚠ Safety", border = Fault) { UstadBody(focus.safety) }
+
+  ExpertCallCard(expertSummary(), say)
+
+  LensMirror(
+      if (confirmed != null) "Fix: ${focus.name}" else "${focus.name} · ${(top.probability * 100).toInt()}%",
+      when {
+        stepIndex in steps.indices -> "Step ${stepIndex + 1}/${steps.size}: ${steps[stepIndex]}"
+        question != null -> "Ustad asks: ${question.question}"
+        else -> "Prove it: ${focus.test}"
+      },
+      machineName)
 
   if (question != null) {
     UstadCard("Ustad asks") {

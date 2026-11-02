@@ -166,6 +166,8 @@ const ease = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
   }
   renderer.render(scene, camera); requestAnimationFrame(frame);
 })();
+// Ustad lens: a still of the current 3D view for the Ray-Ban Display (labels are HTML, not in it).
+window.snapshot = () => { renderer.render(scene, camera); return renderer.domElement.toDataURL('image/jpeg', 0.8); };
 </script>
 </body>
 </html>

@@ -12,6 +12,8 @@ package com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad
 enum class MachineKind(val kbFile: String?, val page: String, val parts: Map<String, String>) {
   CAR("car", "car.html", MachineLibrary.carParts),
   SPLIT_AC("split_ac", "split_ac_indoor.html", MachineLibrary.acParts),
+  /** Lithium-ion packs: diagnosed by BatteryModel (measurements + what the camera saw). */
+  BATTERY(null, "battery.html", BatteryModel.parts),
   OTHER(null, "generic.html", emptyMap());
 
   val hasExpertModel: Boolean
@@ -28,6 +30,15 @@ object MachineRouter {
           RegexOption.IGNORE_CASE,
       )
 
+  // Lithium packs (e-bike, scooter, power bank, tool, storage). A car's 12V battery stays with the car.
+  private val batteryWords =
+      Regex(
+          """\b(battery pack|lithium|li-ion|li ion|lion battery|lipo|li-po|lifepo4|power ?bank|18650|21700|""" +
+              """e-?bike battery|scooter battery|battery module|battery cell|cell pack|drone battery|tool battery|""" +
+              """ups battery|solar battery|storage battery)\b""",
+          RegexOption.IGNORE_CASE,
+      )
+
   private val acWords =
       Regex(
           """\b(air[ -]?con(ditioner|ditioning)?|aircon|a/c|ac|hvac|split (unit|ac|system)|""" +
@@ -39,6 +50,10 @@ object MachineRouter {
   fun detect(machineText: String, partIds: Collection<String> = emptyList()): MachineKind {
     if (partIds.any { it in MachineLibrary.carParts }) return MachineKind.CAR
     if (partIds.any { it in MachineLibrary.acParts }) return MachineKind.SPLIT_AC
+    if (partIds.any { it in BatteryModel.parts }) return MachineKind.BATTERY
+    if (batteryWords.containsMatchIn(machineText) && !Regex("""\b(12v|car battery)\b""", RegexOption.IGNORE_CASE).containsMatchIn(machineText)) {
+      return MachineKind.BATTERY
+    }
     // Car first: car text often mentions "A/C" (the car's own air conditioning).
     if (carWords.containsMatchIn(machineText)) return MachineKind.CAR
     if (acWords.containsMatchIn(machineText)) return MachineKind.SPLIT_AC
@@ -83,6 +98,17 @@ object MachineRouter {
                   "p-pcb" to listOf("board", "pcb", "control", "sensor", "electr", "wiring"),
                   "p-louver" to listOf("louver", "louvre", "vane", "flap", "swing"),
                   "p-cover" to listOf("cover", "panel", "casing", "housing"),
+              )
+          MachineKind.BATTERY ->
+              listOf(
+                  "b-separator" to listOf("separator", "short", "thermal"),
+                  "b-electrolyte" to listOf("electrolyte", "swell", "gas", "leak"),
+                  "b-anode" to listOf("anode", "sei", "plating", "graphite"),
+                  "b-cathode" to listOf("cathode"),
+                  "b-bms" to listOf("bms", "board", "protection", "balanc"),
+                  "b-terminals" to listOf("terminal", "connector", "wire", "corros"),
+                  "b-casing" to listOf("casing", "case", "housing", "cover"),
+                  "b-cell" to listOf("cell", "capacity", "degrad"),
               )
           MachineKind.OTHER -> emptyList()
         }

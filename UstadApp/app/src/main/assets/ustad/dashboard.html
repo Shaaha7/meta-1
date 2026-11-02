@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ustad Team Dashboard</title>
+<style>
+  :root { --bg:#070c18; --card:#0f1a30; --line:#172a4d; --text:#e8f1ff; --muted:#8aa0c0; --hud:#39e6ff; --ok:#34d399; --warn:#fbbf24; --bad:#ff3b30; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font-family: system-ui, "Segoe UI", sans-serif; padding:16px; }
+  h1 { font-size:20px; margin:0 0 2px; letter-spacing:.04em; } .sub { color:var(--muted); font-size:12px; margin-bottom:14px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:10px; margin-bottom:14px; }
+  .kpi { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px; }
+  .kpi b { display:block; font-size:26px; } .kpi span { color:var(--muted); font-size:12px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px; margin-bottom:12px; }
+  .card h2 { font-size:12px; color:var(--hud); letter-spacing:.14em; margin:0 0 10px; text-transform:uppercase; }
+  table { width:100%; border-collapse:collapse; font-size:13px; } th { text-align:left; color:var(--muted); font-weight:500; padding:6px 4px; border-bottom:1px solid var(--line); }
+  td { padding:7px 4px; border-bottom:1px solid #0c1527; vertical-align:top; }
+  .badge { display:inline-block; background:#0e3a2c; color:var(--ok); border:1px solid #1e6b52; border-radius:999px; padding:1px 8px; font-size:11px; margin:1px 2px 1px 0; }
+  .help { color:var(--warn); font-size:11px; }
+  .bar { height:8px; background:#13213d; border-radius:4px; overflow:hidden; } .bar i { display:block; height:100%; background:var(--hud); }
+  .row { display:flex; gap:8px; align-items:center; margin:6px 0; font-size:13px; } .row .l { flex:1; } .row .n { color:var(--muted); width:28px; text-align:right; }
+  .score { font-weight:700; } .muted { color:var(--muted); } .empty { color:var(--muted); font-size:13px; }
+</style>
+</head>
+<body>
+<h1>USTAD · Team dashboard</h1>
+<div class="sub" id="sub">Skill Passports, badges and jobs from your team's phones</div>
+<div class="grid" id="kpis"></div>
+<div class="card"><h2>Technicians</h2><div id="learners"></div></div>
+<div class="card"><h2>Skill badges</h2><div id="badges"></div></div>
+<div class="card"><h2>Most common faults</h2><div id="causes"></div></div>
+<div class="card"><h2>Recent jobs</h2><div id="jobs"></div></div>
+<script>
+// Drawn from Dashboard.build() in the app. A shared copy has the data embedded in USTAD_DATA.
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const day = t => t ? new Date(t).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : '';
+const color = s => s >= 80 ? 'var(--ok)' : s >= 50 ? 'var(--warn)' : 'var(--bad)';
+function render(d) {
+  const t = d.totals || {};
+  document.getElementById('sub').textContent = 'Generated ' + new Date(d.generated || Date.now()).toLocaleString() + ' · data stays on the team\'s phones';
+  document.getElementById('kpis').innerHTML = [
+    ['learners', 'technicians'], ['lessons_done', 'lessons completed'], ['badges', 'skill badges'],
+    ['jobs', 'jobs logged'], ['jobs_fixed', 'repairs finished'], ['brain_cases', 'fixes Ustad learned from']
+  ].map(([k, l]) => `<div class="kpi"><b>${t[k] ?? 0}</b><span>${l}</span></div>`).join('');
+  const L = d.learners || [];
+  document.getElementById('learners').innerHTML = L.length ? `<table><tr><th>Name</th><th>Average</th><th>Lessons</th><th>Badges</th></tr>${L.map(x => `
+    <tr><td>${esc(x.name)}<div class="muted" style="font-size:11px">last active ${day(x.last)}</div></td>
+    <td class="score" style="color:${color(x.average)}">${x.average}</td><td>${x.lessons}</td>
+    <td>${(x.badges || []).map(b => `<span class="badge">🏅 ${esc(b)}</span>`).join('') || '<span class="muted">none yet</span>'}
+    ${(x.needs_help || []).length ? `<div class="help">needs help: ${x.needs_help.map(esc).join(', ')}</div>` : ''}</td></tr>`).join('')}</table>`
+    : '<div class="empty">No lessons completed yet. Import your team\'s records in the app.</div>';
+  const B = d.badges || [];
+  document.getElementById('badges').innerHTML = B.length ? B.map(b => `<div class="row"><span class="l">🏅 <b>${esc(b.lesson)}</b> · ${esc(b.learner)}</span><span class="n">${b.score}</span></div>`).join('')
+    : '<div class="empty">Badges are earned with a score of 80+ ("Ready to work solo").</div>';
+  const C = d.top_causes || [], max = Math.max(1, ...C.map(c => c.count));
+  document.getElementById('causes').innerHTML = C.length ? C.map(c => `<div class="row"><span class="l">${esc(c.cause)}<div class="bar"><i style="width:${100 * c.count / max}%"></i></div></span><span class="n">${c.count}</span></div>`).join('')
+    : '<div class="empty">No jobs yet.</div>';
+  const J = d.recent_jobs || [];
+  document.getElementById('jobs').innerHTML = J.length ? `<table><tr><th>Date</th><th>Machine</th><th>Cause</th><th></th></tr>${J.map(j => `
+    <tr><td>${day(j.at)}</td><td>${esc(j.machine)}<div class="muted" style="font-size:11px">${esc(j.technician)}</div></td><td>${esc(j.cause)}</td><td>${j.fixed ? '✅' : '…'}</td></tr>`).join('')}</table>`
+    : '<div class="empty">No jobs yet.</div>';
+}
+window.render = render;
+if (window.USTAD_DATA) render(window.USTAD_DATA);
+</script>
+</body>
+</html>

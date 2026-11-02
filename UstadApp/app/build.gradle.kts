@@ -46,6 +46,12 @@ android {
     manifestPlaceholders["mwdat_client_token"] =
         localProperties.getProperty("mwdat_client_token", "")
 
+    // Ustad backend (../backend): when set, the app sends AI and voice requests there with an app
+    // token and holds NO Gemini / ElevenLabs keys. Recommended for any APK you share.
+    buildConfigField(
+        "String", "USTAD_BACKEND_URL", "\"${localProperties.getProperty("USTAD_BACKEND_URL", "")}\"")
+    buildConfigField(
+        "String", "USTAD_APP_TOKEN", "\"${localProperties.getProperty("USTAD_APP_TOKEN", "")}\"")
     // Ustad: Gemini key and model from local.properties (never commit the key).
     buildConfigField(
         "String", "GEMINI_API_KEY", "\"${localProperties.getProperty("GEMINI_API_KEY", "")}\"")
@@ -115,6 +121,10 @@ dependencies {
   implementation(libs.mwdat.mockdevice)
   // Ustad: on-device face detection (bundled model, works offline) for the privacy filter.
   implementation(libs.mlkit.face.detection)
+  // Ustad: on-device text reading, used to find and blur car number plates.
+  implementation(libs.mlkit.text.recognition)
+  // Ustad: Ray-Ban Display (in-lens view). Does nothing on glasses without a display.
+  implementation(libs.mwdat.display)
   testImplementation(libs.junit)
   // Real org.json for JVM unit tests (the Android one is a stub there).
   testImplementation(libs.org.json)
