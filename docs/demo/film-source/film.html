@@ -1,0 +1,710 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Ustad film</title>
+<style>
+  :root { --c: #39e6ff; --v: #8b7bff; --r: #ff3b30; --g: #34d399; --ink: #e8f4ff; --mut: #8aa0c0; }
+  html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: #03060d; font-family: Inter, "Inter Display", sans-serif; color: var(--ink); }
+  canvas { display: block; position: absolute; inset: 0; }
+  .layer { position: absolute; inset: 0; pointer-events: none; }
+  #labels .lbl { position: absolute; transform: translate(-50%, -100%); white-space: nowrap; font-size: 19px; color: var(--c);
+         background: rgba(6,11,22,.82); border: 1px solid rgba(57,230,255,.55); padding: 4px 12px; border-radius: 10px; opacity: 0; }
+  #labels .lbl.fault { color: #fff; background: var(--r); border-color: var(--r); font-weight: 800; font-size: 22px; box-shadow: 0 0 28px rgba(255,59,48,.7); }
+  #labels .lbl.ok { color: #02150d; background: var(--g); border-color: var(--g); font-weight: 800; font-size: 22px; box-shadow: 0 0 28px rgba(52,211,153,.7); }
+
+  /* lens / POV */
+  #lens { background: radial-gradient(ellipse 72% 78% at 50% 50%, transparent 58%, rgba(0,6,14,.55) 78%, rgba(0,3,8,.96) 100%); }
+  #lens .tint { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(57,230,255,.05), rgba(139,123,255,.06)); }
+  .corner { position: absolute; width: 70px; height: 70px; border: 3px solid var(--c); opacity: .85; filter: drop-shadow(0 0 8px var(--c)); }
+  .tl { left: 230px; top: 130px; border-right: 0; border-bottom: 0; border-radius: 14px 0 0 0; }
+  .tr { right: 230px; top: 130px; border-left: 0; border-bottom: 0; border-radius: 0 14px 0 0; }
+  .bl { left: 230px; bottom: 130px; border-right: 0; border-top: 0; border-radius: 0 0 0 14px; }
+  .br { right: 230px; bottom: 130px; border-left: 0; border-top: 0; border-radius: 0 0 14px 0; }
+  #status { position: absolute; left: 250px; top: 150px; font-size: 20px; letter-spacing: .18em; font-weight: 700; color: var(--c); text-shadow: 0 0 12px rgba(57,230,255,.8); }
+  #status .dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: var(--r); margin-right: 10px; box-shadow: 0 0 12px var(--r); }
+  #clock { position: absolute; right: 250px; top: 150px; font-size: 20px; letter-spacing: .12em; color: var(--c); font-weight: 600; }
+  #reticle { position: absolute; left: 50%; top: 50%; width: 90px; height: 90px; margin: -45px; border: 2px solid rgba(57,230,255,.7); border-radius: 50%; }
+  #reticle::after { content: ""; position: absolute; left: 50%; top: 50%; width: 8px; height: 8px; margin: -4px; border-radius: 50%; background: var(--c); box-shadow: 0 0 10px var(--c); }
+  #scan { position: absolute; left: 0; right: 0; height: 160px; background: linear-gradient(180deg, transparent, rgba(57,230,255,.10) 70%, rgba(57,230,255,.75) 98%, transparent); }
+  #flash { background: #fff; opacity: 0; }
+  #shot { position: absolute; left: 50%; top: 210px; transform: translateX(-50%); font-size: 22px; font-weight: 800; letter-spacing: .2em; color: #fff;
+          background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.5); padding: 8px 22px; border-radius: 30px; }
+  .chip { position: absolute; font-size: 21px; font-weight: 700; padding: 10px 20px; border-radius: 40px; background: rgba(6,14,28,.78);
+          border: 1px solid rgba(57,230,255,.55); color: var(--ink); white-space: nowrap; backdrop-filter: blur(6px); }
+  .chip b { color: var(--c); }
+  .box { position: absolute; border: 2px solid var(--c); border-radius: 10px; box-shadow: 0 0 18px rgba(57,230,255,.45), inset 0 0 18px rgba(57,230,255,.15); }
+  .box span { position: absolute; left: -2px; top: -38px; font-size: 18px; font-weight: 800; padding: 4px 10px; border-radius: 8px; background: var(--c); color: #001018; white-space: nowrap; }
+  .box.hot { border-color: var(--r); box-shadow: 0 0 26px rgba(255,59,48,.7), inset 0 0 22px rgba(255,59,48,.25); }
+  .box.hot span { background: var(--r); color: #fff; }
+
+  /* reasoning panel */
+  .glass { position: absolute; background: linear-gradient(160deg, rgba(14,26,50,.86), rgba(6,12,26,.9)); border: 1px solid rgba(57,230,255,.35);
+           border-radius: 26px; box-shadow: 0 30px 80px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.08); backdrop-filter: blur(14px); }
+  #panel { right: 120px; top: 190px; width: 620px; padding: 34px 38px; }
+  .ptitle { font-size: 17px; letter-spacing: .28em; color: var(--c); font-weight: 800; }
+  .psub { font-size: 15px; color: var(--mut); margin-top: 6px; }
+  .ev { display: flex; align-items: center; gap: 14px; font-size: 21px; margin: 14px 0; }
+  .ev i { font-style: normal; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: rgba(52,211,153,.18); color: var(--g); font-weight: 900; font-size: 18px; }
+  .cause { margin: 18px 0 0; }
+  .cause .row { display: flex; justify-content: space-between; font-size: 21px; font-weight: 600; }
+  .cause .row em { font-style: normal; font-weight: 900; color: var(--c); }
+  .bar { height: 12px; border-radius: 8px; background: rgba(255,255,255,.07); margin-top: 8px; overflow: hidden; }
+  .bar div { height: 100%; border-radius: 8px; background: linear-gradient(90deg, var(--v), var(--c)); }
+  .cause.top .row em { color: #fff; } .cause.top .bar div { background: linear-gradient(90deg, #ff7a45, var(--r)); box-shadow: 0 0 16px rgba(255,59,48,.8); }
+  #graph { left: 120px; top: 190px; width: 640px; height: 560px; padding: 0; }
+  #graph svg { position: absolute; inset: 0; }
+
+  /* chain */
+  #chain { position: absolute; left: 50%; bottom: 210px; transform: translateX(-50%); display: flex; gap: 0; align-items: center; }
+  #chain .c { font-size: 22px; font-weight: 700; padding: 14px 22px; border-radius: 16px; background: rgba(8,16,32,.88); border: 1px solid rgba(255,59,48,.6); white-space: nowrap; }
+  #chain .a { color: var(--r); font-size: 30px; padding: 0 12px; font-weight: 900; }
+  #big { position: absolute; left: 120px; top: 120px; }
+  #big .k { font-size: 18px; letter-spacing: .3em; color: var(--c); font-weight: 800; }
+  #big .h { font-size: 58px; font-weight: 900; letter-spacing: -.02em; margin-top: 10px; line-height: 1.05; }
+  #big .h span { background: linear-gradient(90deg, var(--c), var(--v)); -webkit-background-clip: text; color: transparent; }
+
+  /* Ray-Ban Display style card */
+  #display { right: 260px; bottom: 260px; width: 560px; padding: 28px 32px; border-radius: 30px; border-color: rgba(255,255,255,.22);
+             background: linear-gradient(160deg, rgba(20,24,34,.82), rgba(8,10,16,.86)); }
+  #display .top { display: flex; justify-content: space-between; align-items: center; font-size: 16px; letter-spacing: .2em; color: var(--mut); font-weight: 700; }
+  #display .step { font-size: 31px; font-weight: 800; margin-top: 16px; line-height: 1.22; }
+  #display .hint { font-size: 18px; color: var(--c); margin-top: 16px; font-weight: 600; }
+  #display .dots { display: flex; gap: 8px; margin-top: 18px; } #display .dots b { flex: 1; height: 6px; border-radius: 4px; background: rgba(255,255,255,.15); }
+  #display .dots b.on { background: var(--c); box-shadow: 0 0 10px var(--c); }
+  .safety { display: inline-block; font-size: 15px; font-weight: 900; letter-spacing: .14em; padding: 6px 12px; border-radius: 8px; background: #fbbf24; color: #1a1200; }
+  #verified { left: 50%; top: 46%; transform: translate(-50%, -50%); font-size: 40px; font-weight: 900; padding: 22px 46px; border-radius: 60px;
+              background: rgba(4,30,20,.85); border: 2px solid var(--g); color: var(--g); box-shadow: 0 0 60px rgba(52,211,153,.5); }
+
+  /* subtitles */
+  #subs { position: absolute; left: 50%; bottom: 74px; transform: translateX(-50%); display: flex; align-items: center; gap: 22px; max-width: 1500px;
+          padding: 18px 30px 18px 22px; border-radius: 26px; background: rgba(3,8,18,.72); border: 1px solid rgba(255,255,255,.1); backdrop-filter: blur(10px); }
+  #subs .who { font-size: 14px; letter-spacing: .24em; font-weight: 900; padding: 8px 12px; border-radius: 10px; white-space: nowrap; }
+  #subs .who.ustad { background: linear-gradient(90deg, var(--c), var(--v)); color: #00101a; }
+  #subs .who.tech { background: rgba(255,255,255,.14); color: #fff; }
+  #subs .txt { font-size: 31px; font-weight: 600; line-height: 1.3; }
+  #subs .txt .dim { opacity: .28; }
+  #wave { display: flex; gap: 4px; align-items: center; height: 44px; } #wave b { width: 5px; border-radius: 3px; background: var(--c); }
+  #wake { left: 50%; top: 170px; transform: translateX(-50%); }
+
+  /* titles */
+  #title { display: grid; place-items: center; text-align: center; }
+  #title .logo { font-size: 170px; font-weight: 900; letter-spacing: .32em; margin-left: .32em; background: linear-gradient(180deg, #fff, #9fdcff 60%, #5b8cff);
+                 -webkit-background-clip: text; color: transparent; filter: drop-shadow(0 0 40px rgba(57,230,255,.45)); }
+  #title .tag { font-size: 34px; font-weight: 500; color: #cfe6ff; margin-top: 8px; letter-spacing: .04em; }
+  #title .meta { font-size: 17px; letter-spacing: .34em; color: var(--mut); margin-top: 34px; font-weight: 700; }
+  #title .words { display: flex; gap: 46px; justify-content: center; margin-top: 30px; font-size: 30px; font-weight: 800; letter-spacing: .1em; }
+  #title .words span:nth-child(1) { color: var(--c); } #title .words span:nth-child(2) { color: #b8a9ff; } #title .words span:nth-child(3) { color: var(--g); }
+  #titlewrap { position: absolute; left: 0; right: 0; top: 650px; text-align: center; }
+
+  /* tutor */
+  #tutor { display: flex; gap: 40px; justify-content: center; align-items: flex-start; padding-top: 300px; box-sizing: border-box; }
+  .tcard { width: 440px; padding: 34px; position: relative; }
+  .tcard .n { font-size: 16px; letter-spacing: .26em; font-weight: 900; color: var(--c); }
+  .tcard .t { font-size: 36px; font-weight: 900; margin-top: 12px; line-height: 1.1; }
+  .tcard .d { font-size: 20px; color: #b9c9e0; margin-top: 14px; line-height: 1.45; }
+  .tcard .li { font-size: 19px; margin-top: 12px; padding: 10px 14px; border-radius: 12px; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.08); }
+  .rec { display: inline-block; width: 14px; height: 14px; border-radius: 50%; background: var(--r); box-shadow: 0 0 12px var(--r); margin-right: 8px; }
+  #tutorHead { position: absolute; left: 0; right: 0; top: 150px; text-align: center; }
+  #tutorHead .k { font-size: 18px; letter-spacing: .32em; font-weight: 800; color: var(--c); }
+  #tutorHead .h { font-size: 60px; font-weight: 900; margin-top: 10px; }
+  #badge { left: 50%; top: 650px; transform: translateX(-50%); display: flex; align-items: center; gap: 22px; padding: 20px 34px; border-color: rgba(251,191,36,.6); }
+  #badge .medal { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; font-size: 34px;
+                  background: radial-gradient(circle at 35% 30%, #fff3b0, #fbbf24 55%, #b45309); box-shadow: 0 0 30px rgba(251,191,36,.7); }
+  #badge .bt { font-size: 15px; letter-spacing: .26em; color: #fbbf24; font-weight: 900; } #badge .bn { font-size: 27px; font-weight: 800; margin-top: 4px; }
+  #fade { background: #000; opacity: 0; }
+  #bars::before, #bars::after { content: ""; position: absolute; left: 0; right: 0; height: 0; background: #000; }
+  #grain { opacity: .06; mix-blend-mode: overlay; }
+</style>
+</head>
+<body>
+<div id="labels" class="layer"></div>
+<div id="lens" class="layer"><div class="tint"></div>
+  <div class="corner tl"></div><div class="corner tr"></div><div class="corner bl"></div><div class="corner br"></div>
+  <div id="status"><span class="dot"></span>USTAD · GLASSES CAMERA</div><div id="clock">09:41 · 🔋 86%</div>
+  <div id="reticle"></div><div id="scan"></div><div id="shot">◉ CAPTURED</div>
+  <div id="boxes"></div>
+</div>
+<div id="privacy" class="chip" style="left:250px;top:215px">🔒 <b>Faces &amp; plates blurred</b> on the phone</div>
+<div id="wake" class="chip">🎙 Wake word heard: <b>“Ustad”</b></div>
+<div id="graph" class="glass"><svg viewBox="0 0 640 560"></svg></div>
+<div id="panel" class="glass">
+  <div class="ptitle">USTAD IS REASONING</div><div class="psub">Knowledge-base brain · 14 car failure modes · Bayesian</div>
+  <div style="margin-top:20px">
+    <div class="ev"><i>✓</i>White crust on the − terminal</div>
+    <div class="ev"><i>✓</i>Battery warning light on</div>
+    <div class="ev"><i>✓</i>Engine won't crank</div>
+  </div>
+  <div id="causes"></div>
+</div>
+<div id="big"><div class="k">EXPLODED VIEW</div><div class="h">The hidden part,<br><span>shown in 3D</span></div></div>
+<div id="chain"></div>
+<div id="display" class="glass">
+  <div class="top"><span>USTAD · RAY-BAN DISPLAY</span><span id="dstep">1 / 4</span></div>
+  <div id="dsafe" style="margin-top:16px"><span class="safety">⚠ SAFETY STOP</span></div>
+  <div class="step" id="dtext"></div><div class="hint" id="dhint"></div>
+  <div class="dots"><b></b><b></b><b></b><b></b></div>
+</div>
+<div id="voicecmd" class="chip" style="left:50%;top:170px;transform:translateX(-50%)">🎙 <b>“Next”</b></div>
+<div id="verified" class="chip">✓ Verified by photo</div>
+<div id="tutorHead"><div class="k">THE TUTOR</div><div class="h">One expert. Every learner.</div></div>
+<div id="tutor" class="layer">
+  <div class="tcard glass" id="t1"><div class="n">01 · RECORD</div><div class="t">The expert does the job once</div>
+    <div class="d"><span class="rec"></span>Recorded hands-free on the glasses — their own words, their own tricks.</div></div>
+  <div class="tcard glass" id="t2"><div class="n">02 · BUILD</div><div class="t">Ustad writes the lesson</div>
+    <div class="li">1 · Ignition off, − first</div><div class="li">2 · Clean the terminals</div><div class="li">3 · Checkpoint: show me</div></div>
+  <div class="tcard glass" id="t3"><div class="n">03 · GUIDE</div><div class="t">Every learner is coached</div>
+    <div class="d">Step by step in their language, checked by photo, then quizzed.</div></div>
+</div>
+<div id="badge" class="glass"><div class="medal">★</div><div><div class="bt">SKILL PASSPORT</div><div class="bn">12V battery service · 92%</div></div></div>
+<div id="title" class="layer"><div id="titlewrap">
+  <div class="logo">USTAD</div><div class="tag" id="tag">The master technician in your glasses</div>
+  <div class="words" id="words"><span>INSPECT</span><span>EXPLAIN</span><span>TEACH</span></div>
+  <div class="meta" id="meta">META RAY-BAN · WEARABLES DEVICE ACCESS TOOLKIT</div>
+</div></div>
+<div id="subs"><div class="who ustad" id="who">USTAD</div><div id="wave"></div><div class="txt" id="txt"></div></div>
+<canvas id="grain" class="layer" width="480" height="270" style="width:1920px;height:1080px"></canvas>
+<div id="flash" class="layer"></div>
+<div id="fade" class="layer"></div>
+<script src="three.min.js"></script>
+<script>
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(1);
+renderer.setSize(1920, 1080);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.08;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.prepend(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x05080f);
+scene.fog = new THREE.Fog(0x05080f, 14, 30);
+const camera = new THREE.PerspectiveCamera(36, 1920 / 1080, .05, 100);
+scene.add(new THREE.HemisphereLight(0xcfe6ff, 0x101828, .75));
+const key = new THREE.DirectionalLight(0xffffff, 2.4);
+key.position.set(5, 9, 6); key.castShadow = true;
+key.shadow.mapSize.set(2048, 2048); key.shadow.bias = -.0004;
+Object.assign(key.shadow.camera, { left: -7, right: 7, top: 7, bottom: -7, near: 1, far: 30 });
+scene.add(key);
+const rim = new THREE.DirectionalLight(0x39e6ff, 1.6); rim.position.set(-7, 3, -6); scene.add(rim);
+const fill = new THREE.DirectionalLight(0x8b7bff, .7); fill.position.set(-4, 2, 7); scene.add(fill);
+const root = new THREE.Group(); root.position.y = -.55; scene.add(root);
+const grid = new THREE.GridHelper(26, 26, 0x1d3b66, 0x0f203c); root.add(grid);
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(26, 26), new THREE.ShadowMaterial({ opacity: .45 }));
+ground.rotation.x = -Math.PI / 2; ground.position.y = .002; ground.receiveShadow = true; root.add(ground);
+
+// ---------- materials and shape helpers ----------
+const std = (color, o = {}) => new THREE.MeshStandardMaterial(Object.assign({ color, roughness: .45, metalness: .35, transparent: true }, o));
+const paint = () => new THREE.MeshPhysicalMaterial({ color: 0x1d5fd6, metalness: .55, roughness: .26, clearcoat: 1, clearcoatRoughness: .08, transparent: true });
+const chrome = () => std(0xc9d2dc, { metalness: .95, roughness: .18 });
+const rubber = () => std(0x14171c, { metalness: .05, roughness: .9 });
+const darkPlastic = () => std(0x1a1f29, { metalness: .2, roughness: .6 });
+
+/** Box with rounded edges (extruded rounded rectangle). */
+function rbox(w, h, d, r = .04) {
+  r = Math.min(r, w / 2 - .001, h / 2 - .001, d / 2 - .001);
+  const s = new THREE.Shape(), x = -w / 2 + r, y = -h / 2 + r, W = w - 2 * r, H = h - 2 * r;
+  s.moveTo(x, y - r); s.lineTo(x + W, y - r); s.quadraticCurveTo(x + W + r, y - r, x + W + r, y);
+  s.lineTo(x + W + r, y + H); s.quadraticCurveTo(x + W + r, y + H + r, x + W, y + H + r);
+  s.lineTo(x, y + H + r); s.quadraticCurveTo(x - r, y + H + r, x - r, y + H); s.lineTo(x - r, y); s.quadraticCurveTo(x - r, y - r, x, y - r);
+  const g = new THREE.ExtrudeGeometry(s, { depth: d - 2 * r, bevelEnabled: true, bevelThickness: r, bevelSize: r * .6, bevelSegments: 3, curveSegments: 6 });
+  g.translate(0, 0, -(d - 2 * r) / 2); return g;
+}
+const cyl = (r, h, s = 32) => new THREE.CylinderGeometry(r, r, h, s);
+const tube = (pts, r, seg = 48) => new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts.map(p => new THREE.Vector3(...p))), seg, r, 10, false);
+class Helix extends THREE.Curve {
+  constructor(r, h, turns) { super(); this.r = r; this.h = h; this.turns = turns; }
+  getPoint(t, v = new THREE.Vector3()) { const a = t * this.turns * Math.PI * 2; return v.set(Math.cos(a) * this.r, (t - .5) * this.h, Math.sin(a) * this.r); }
+}
+function stripes(colorA, colorB, n = 48) { // radiator fins
+  const c = document.createElement('canvas'); c.width = 256; c.height = 64; const x = c.getContext('2d');
+  for (let i = 0; i < n; i++) { x.fillStyle = i % 2 ? colorA : colorB; x.fillRect(i * 256 / n, 0, 256 / n, 64); }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+
+// ---------- parts ----------
+const labelsEl = document.getElementById('labels');
+const parts = {};
+function part(id, name, meshes, out, opts = {}) {
+  const g = new THREE.Group();
+  meshes.forEach(([geo, m, pos, rot]) => {
+    const mesh = new THREE.Mesh(geo, m);
+    m.userData.e0 = m.emissive ? m.emissive.clone() : null; m.userData.i0 = m.emissiveIntensity || 0; m.userData.base = m.opacity;
+    mesh.position.set(...pos); if (rot) mesh.rotation.set(...rot);
+    mesh.castShadow = true; mesh.receiveShadow = true; g.add(mesh);
+  });
+  const bb = new THREE.Box3().setFromObject(g);
+  const el = document.createElement('div'); el.className = 'lbl'; el.textContent = name; labelsEl.appendChild(el);
+  g.userData = { id, name, el, out: new THREE.Vector3(...out), shell: !!opts.shell,
+    anchor: new THREE.Vector3((bb.min.x + bb.max.x) / 2, bb.max.y + .1, (bb.min.z + bb.max.z) / 2) };
+  root.add(g); parts[id] = g;
+}
+
+// Body: side profile with wheel arches, extruded and bevelled; greenhouse glass; lights; mirrors.
+const WF = 1.42, WR = -1.36, WY = .4, WZ = .8; // wheel centres
+const profile = new THREE.Shape();
+profile.moveTo(-2.18, .3);
+profile.lineTo(WR - .5, .3); profile.absarc(WR, WY - .02, .48, Math.PI, 0, true);
+profile.lineTo(WF - .5, .3); profile.absarc(WF, WY - .02, .48, Math.PI, 0, true);
+profile.lineTo(2.12, .3); profile.quadraticCurveTo(2.26, .32, 2.24, .55);
+profile.quadraticCurveTo(2.22, .78, 2.05, .83);
+profile.lineTo(.82, .97); profile.quadraticCurveTo(.45, 1.22, .16, 1.38);
+profile.quadraticCurveTo(-.4, 1.46, -1.0, 1.4); profile.quadraticCurveTo(-1.45, 1.3, -1.72, 1.03);
+profile.lineTo(-2.08, .97); profile.quadraticCurveTo(-2.24, .9, -2.22, .6); profile.quadraticCurveTo(-2.22, .36, -2.18, .3);
+const bodyGeo = new THREE.ExtrudeGeometry(profile, { depth: 1.62, bevelEnabled: true, bevelThickness: .09, bevelSize: .08, bevelSegments: 5, curveSegments: 24 });
+bodyGeo.translate(0, 0, -.81);
+const glassShape = new THREE.Shape();
+glassShape.moveTo(.8, 1.0); glassShape.quadraticCurveTo(.44, 1.22, .16, 1.35); glassShape.quadraticCurveTo(-.4, 1.42, -.98, 1.37);
+glassShape.quadraticCurveTo(-1.4, 1.28, -1.66, 1.05); glassShape.lineTo(.8, 1.0);
+const glassGeo = new THREE.ExtrudeGeometry(glassShape, { depth: 1.66, bevelEnabled: true, bevelThickness: .06, bevelSize: .04, bevelSegments: 3, curveSegments: 20 });
+glassGeo.translate(0, 0, -.83);
+const glass = std(0x0b1a2c, { metalness: .9, roughness: .05, opacity: .9 });
+const headlight = () => std(0xeaf6ff, { emissive: 0xbfe6ff, emissiveIntensity: .9, metalness: .1, roughness: .1 });
+const taillight = () => std(0xff3344, { emissive: 0xff1a2a, emissiveIntensity: .8 });
+part('c-body', 'Body shell', [
+  [bodyGeo, paint(), [0, 0, 0]],
+  [glassGeo, glass, [0, .01, 0]],
+  [rbox(.08, .1, .34, .03), headlight(), [2.2, .7, .58]], [rbox(.08, .1, .34, .03), headlight(), [2.2, .7, -.58]],
+  [rbox(.06, .1, .3, .03), taillight(), [-2.27, .82, .6]], [rbox(.06, .1, .3, .03), taillight(), [-2.27, .82, -.6]],
+  [rbox(.14, .09, .06, .02), paint(), [.62, 1.0, .95]], [rbox(.14, .09, .06, .02), paint(), [.62, 1.0, -.95]],
+  [rbox(.04, .02, 1.3, .01), chrome(), [-.42, .62, 0]], // side trim reads as a belt line through the ghosted shell
+], [0, 2.7, 0], { shell: true });
+
+// Hood: a curved panel matching the body line.
+const hoodShape = new THREE.Shape();
+hoodShape.moveTo(.86, .985); hoodShape.lineTo(2.03, .855); hoodShape.lineTo(2.03, .83); hoodShape.lineTo(.86, .955); hoodShape.lineTo(.86, .985);
+const hoodGeo = new THREE.ExtrudeGeometry(hoodShape, { depth: 1.5, bevelEnabled: true, bevelThickness: .05, bevelSize: .03, bevelSegments: 3 });
+hoodGeo.translate(0, .02, -.75);
+part('c-hood', 'Hood (bonnet)', [[hoodGeo, paint(), [0, 0, 0]]], [.6, 1.9, 0], { shell: true });
+
+// Front bumper with grille.
+part('c-bumper', 'Front bumper', [
+  [rbox(.24, .36, 1.9, .1), darkPlastic(), [2.2, .44, 0]],
+  [rbox(.05, .14, .9, .03), std(0x0c0f14, { metalness: .5, roughness: .3 }), [2.33, .5, 0]],
+  [rbox(.02, .03, .86, .01), chrome(), [2.36, .56, 0]],
+], [1.4, .1, 0], { shell: true });
+
+// Engine: block, head with valve cover, intake runners, pulleys and belt, alternator, oil cap.
+const runners = [-.24, -.08, .08, .24].map(z => [tube([[1.0, .7, z], [1.05, .86, z], [1.25, .9, z], [1.36, .78, z]], .035), chrome(), [0, 0, 0]]);
+part('c-engine', 'Engine', [
+  [rbox(.78, .42, .66, .06), std(0x5b6573, { metalness: .75, roughness: .35 }), [1.32, .5, 0]],
+  [rbox(.7, .13, .56, .05), std(0x8c1d22, { metalness: .5, roughness: .3 }), [1.32, .78, 0]],
+  [rbox(.24, .2, .62, .05), std(0x3c4450, { metalness: .7 }), [1.0, .7, 0]], // intake plenum
+  ...runners,
+  [cyl(.11, .05), chrome(), [1.74, .55, .18], [0, 0, Math.PI / 2]],
+  [cyl(.075, .05), chrome(), [1.74, .7, -.12], [0, 0, Math.PI / 2]],
+  [new THREE.TorusGeometry(.2, .012, 6, 40), rubber(), [1.76, .6, .03], [0, Math.PI / 2, 0]],
+  [cyl(.09, .14, 24), std(0x2a2f36, { metalness: .6 }), [1.55, .5, .42], [Math.PI / 2, 0, 0]], // alternator
+  [cyl(.04, .04, 16), std(0xf2c230, { roughness: .4 }), [1.5, .86, -.15]], // oil cap
+], [.25, 1.55, 0]);
+
+// Radiator: finned core in a frame, coolant reservoir, hoses to the engine.
+const fins = new THREE.MeshStandardMaterial({ map: stripes('#9aa6b2', '#5d6874'), metalness: .8, roughness: .35, transparent: true });
+part('c-radiator', 'Radiator & coolant', [
+  [new THREE.BoxGeometry(.05, .46, 1.22), fins, [1.98, .58, 0]],
+  [rbox(.08, .52, 1.3, .02), std(0x2a313b, { metalness: .5 }), [1.99, .58, 0], [0, 0, 0]],
+  [rbox(.16, .16, .2, .04), std(0x9ef0dd, { opacity: .8, roughness: .15, metalness: .05 }), [1.78, .8, -.58]],
+  [tube([[1.95, .78, .36], [1.85, .82, .3], [1.7, .8, .22], [1.62, .76, .2]], .03), rubber(), [0, 0, 0]],
+  [tube([[1.95, .38, -.36], [1.85, .32, -.3], [1.7, .36, -.24], [1.62, .42, -.2]], .03), rubber(), [0, 0, 0]],
+], [.95, .7, 0]);
+
+// 12V battery with red / black terminals and a label stripe.
+part('c-battery12', '12V battery', [
+  [rbox(.32, .22, .22, .03), std(0x15181e, { roughness: .5 }), [1.6, .72, .62]],
+  [rbox(.32, .03, .22, .01), std(0x39e6ff, { emissive: 0x0b4a5a, emissiveIntensity: .4 }), [1.6, .76, .62]],
+  [cyl(.03, .05, 14), std(0xe33b3b), [1.52, .86, .62]], [cyl(.03, .05, 14), std(0x23272e), [1.68, .86, .62]],
+], [.3, 1.35, 1.1]);
+
+// Transmission: bell housing (lathe) behind the engine.
+const bell = new THREE.LatheGeometry([[.05, -.26], [.2, -.24], [.25, -.1], [.24, .08], [.18, .22], [.1, .27], [.05, .28]].map(([r, y]) => new THREE.Vector2(r, y)), 32);
+part('c-gearbox', 'Transmission', [[bell, std(0x6b7480, { metalness: .8, roughness: .3 }), [.68, .48, 0], [0, 0, Math.PI / 2]]], [-.2, 1.1, -1.2]);
+
+// Front suspension: coil springs around dampers.
+const spring = new THREE.TubeGeometry(new Helix(.08, .42, 6), 120, .012, 6, false);
+part('c-suspension', 'Suspension (front strut)', [
+  [spring, std(0xffc233, { metalness: .6, roughness: .3 }), [WF, .74, .58]], [spring, std(0xffc233, { metalness: .6, roughness: .3 }), [WF, .74, -.58]],
+  [cyl(.03, .5, 12), chrome(), [WF, .74, .58]], [cyl(.03, .5, 12), chrome(), [WF, .74, -.58]],
+], [0, 1.0, 0]);
+
+// Brakes: ventilated discs with red calipers (front).
+const disc = () => std(0xb9c1ca, { metalness: .92, roughness: .28 });
+part('c-brake', 'Brakes (disc & pads)', [
+  [cyl(.22, .035, 40), disc(), [WF, WY, .66], [Math.PI / 2, 0, 0]], [rbox(.14, .14, .08, .02), std(0xd8282f, { roughness: .35 }), [WF + .02, WY + .17, .66]],
+  [cyl(.22, .035, 40), disc(), [WF, WY, -.66], [Math.PI / 2, 0, 0]], [rbox(.14, .14, .08, .02), std(0xd8282f, { roughness: .35 }), [WF + .02, WY + .17, -.66]],
+], [0, 0, 0]);
+parts['c-brake'].userData.split = [[0, 0, .8], [0, 0, .8], [0, 0, -.8], [0, 0, -.8]];
+
+// Wheels: lathe-profiled tyres, 5-spoke rims, centre caps.
+const tyre = new THREE.LatheGeometry([[.25, -.12], [.31, -.135], [.37, -.115], [.4, -.05], [.405, 0], [.4, .05], [.37, .115], [.31, .135], [.25, .12]].map(([r, y]) => new THREE.Vector2(r, y)), 48);
+function wheel(id, name, x, z, side) {
+  const meshes = [[tyre, rubber(), [x, WY, z], [Math.PI / 2, 0, 0]], [cyl(.255, .26, 40), std(0xb8c2cc, { metalness: .9, roughness: .22 }), [x, WY, z], [Math.PI / 2, 0, 0]],
+    [cyl(.06, .3, 16), chrome(), [x, WY, z], [Math.PI / 2, 0, 0]]];
+  for (let i = 0; i < 5; i++) {
+    const a = i * Math.PI * 2 / 5;
+    meshes.push([rbox(.2, .045, .03, .01), chrome(), [x + Math.cos(a) * .12, WY + Math.sin(a) * .12, z + side * .135], [0, 0, a]]);
+  }
+  part(id, name, meshes, [0, 0, 1.35 * side]);
+}
+wheel('c-wheel-fl', 'Front-left wheel & tire', WF, WZ, 1); wheel('c-wheel-fr', 'Front-right wheel & tire', WF, -WZ, -1);
+wheel('c-wheel-rl', 'Rear-left wheel & tire', WR, WZ, 1); wheel('c-wheel-rr', 'Rear-right wheel & tire', WR, -WZ, -1);
+
+// EV / hybrid high-voltage pack: tray with a grid of modules.
+const modules = [];
+for (let i = 0; i < 6; i++) for (let j = 0; j < 3; j++) modules.push([rbox(.3, .08, .38, .02), std(0x1aa3ff, { emissive: 0x093a66, emissiveIntensity: .35, metalness: .4 }), [-1.18 + i * .33, .29, -.42 + j * .42]]);
+part('c-hvbattery', 'High-voltage battery (EV/hybrid)', [[rbox(2.1, .08, 1.38, .03), std(0x2a3240, { metalness: .6 }), [-.36, .22, 0]], ...modules], [-.1, .35, 0]);
+
+// Fuel tank and exhaust (with muffler and tip).
+part('c-fuel-tank', 'Fuel tank', [[rbox(.55, .22, .95, .08), std(0x434a55, { metalness: .5 }), [-1.0, .3, .05]]], [-.3, .25, 1.4]);
+part('c-exhaust', 'Exhaust', [
+  [tube([[1.0, .34, -.32], [.6, .2, -.4], [-.2, .18, -.48], [-1.2, .2, -.5], [-2.1, .26, -.52]], .045, 80), std(0x8a9098, { metalness: .85, roughness: .3 }), [0, 0, 0]],
+  [new THREE.CapsuleGeometry(.12, .42, 6, 16), std(0x7d838a, { metalness: .85, roughness: .3 }), [-1.55, .22, -.52], [0, 0, Math.PI / 2]],
+  [cyl(.055, .14, 20), chrome(), [-2.18, .27, -.52], [0, 0, Math.PI / 2]],
+], [-.5, .2, -1.45]);
+
+// ================= FILM =================
+const $ = id => document.getElementById(id);
+const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+const seg = (t, a, b) => clamp((t - a) / (b - a));
+const sm = x => x * x * (3 - 2 * x);
+const eio = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+const lerp = (a, b, k) => a + (b - a) * k;
+const V = (x, y, z) => new THREE.Vector3(x, y, z);
+const vl = (a, b, k) => a.clone().lerp(b, k);
+let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+const show = (el, o, ty = 0, sc = 1) => { el = typeof el === 'string' ? $(el) : el; el.style.opacity = o; el.style.visibility = o > .001 ? 'visible' : 'hidden';
+  if (el.dataset.base === undefined) { const c = getComputedStyle(el).transform; el.dataset.base = c && c !== 'none' ? c : ''; } const base = el.dataset.base; el.style.transform = `${base} translateY(${ty}px) scale(${sc})`; };
+const fadeIO = (t, a, b, f = .5) => Math.min(sm(seg(t, a, a + f)), 1 - sm(seg(t, b - f, b)));
+
+// ---- environment for reflections ----
+{
+  const env = new THREE.Scene();
+  env.add(new THREE.Mesh(new THREE.BoxGeometry(30, 14, 30), new THREE.MeshBasicMaterial({ color: 0x0a1222, side: THREE.BackSide })));
+  const panel = (w, h, c, p, r) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ color: c, side: THREE.DoubleSide })); m.position.set(...p); m.rotation.set(...r); env.add(m); };
+  for (let i = -2; i <= 2; i++) panel(1.2, 9, 0xffffff, [i * 3.4, 6.5, 0], [Math.PI / 2, 0, 0]);
+  panel(10, 2.4, 0x39e6ff, [0, 3, -14.5], [0, 0, 0]); panel(10, 2.4, 0x8b7bff, [-14.5, 3, 0], [0, Math.PI / 2, 0]);
+  panel(6, 3, 0xffd9a8, [14.5, 4, 2], [0, -Math.PI / 2, 0]);
+  const pm = new THREE.PMREMGenerator(renderer); scene.environment = pm.fromScene(env, .03).texture;
+}
+
+// ---- garage ----
+grid.visible = false;
+const floor = new THREE.Mesh(new THREE.CircleGeometry(16, 96), new THREE.MeshStandardMaterial({ color: 0x0b1220, roughness: .32, metalness: .55 }));
+floor.rotation.x = -Math.PI / 2; floor.position.y = -.553; floor.receiveShadow = true; scene.add(floor);
+const ringMat = new THREE.MeshBasicMaterial({ color: 0x39e6ff, transparent: true, opacity: .5, blending: THREE.AdditiveBlending, depthWrite: false });
+const ring = new THREE.Mesh(new THREE.RingGeometry(3.25, 3.29, 160), ringMat); ring.rotation.x = -Math.PI / 2; ring.position.y = -.545; scene.add(ring);
+const ring2 = new THREE.Mesh(new THREE.RingGeometry(3.6, 3.61, 160), ringMat.clone()); ring2.material.opacity = .25; ring2.rotation.x = -Math.PI / 2; ring2.position.y = -.545; scene.add(ring2);
+const strips = new THREE.Group(); scene.add(strips);
+for (let i = 0; i < 5; i++) { const s = new THREE.Mesh(new THREE.BoxGeometry(.08, .08, 9), new THREE.MeshBasicMaterial({ color: 0xbfe9ff }));
+  s.position.set(-4 + i * 2, 4.6, -1); strips.add(s); }
+const wall = new THREE.Mesh(new THREE.PlaneGeometry(40, 12), new THREE.MeshStandardMaterial({ color: 0x0a1120, roughness: .9 })); wall.position.set(0, 4, -9); scene.add(wall);
+for (let i = 0; i < 9; i++) { const s = new THREE.Mesh(new THREE.BoxGeometry(.05, 7, .05), new THREE.MeshBasicMaterial({ color: i % 4 === 0 ? 0x39e6ff : 0x1b2b48 }));
+  s.position.set(-12 + i * 3, 2.5, -8.9); scene.add(s); }
+const spot = new THREE.SpotLight(0xffffff, 60, 18, .55, .6, 1.4); spot.position.set(1.5, 6, 2.5); spot.target.position.set(.8, 0, .2); scene.add(spot, spot.target);
+const blueGlow = new THREE.PointLight(0x39e6ff, 0, 4, 2); scene.add(blueGlow);
+
+// dust motes
+const dustGeo = new THREE.BufferGeometry(), dp = [];
+for (let i = 0; i < 700; i++) dp.push((rnd() - .5) * 14, rnd() * 5 - .5, (rnd() - .5) * 12);
+dustGeo.setAttribute('position', new THREE.Float32BufferAttribute(dp, 3));
+const dot = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
+  const r = g.createRadialGradient(32, 32, 0, 32, 32, 32); r.addColorStop(0, 'rgba(255,255,255,1)'); r.addColorStop(.3, 'rgba(170,230,255,.5)'); r.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = r; g.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(c); })();
+const dust = new THREE.Points(dustGeo, new THREE.PointsMaterial({ size: .05, map: dot, transparent: true, opacity: .5, depthWrite: false, blending: THREE.AdditiveBlending, color: 0x9fdcff }));
+scene.add(dust);
+
+// ---- smart glasses ----
+function lensTexture(active) {
+  const c = document.createElement('canvas'); c.width = 256; c.height = 160; const g = c.getContext('2d');
+  const gr = g.createLinearGradient(0, 0, 256, 160); gr.addColorStop(0, '#0d2340'); gr.addColorStop(1, '#05070d'); g.fillStyle = gr; g.fillRect(0, 0, 256, 160);
+  if (active) { g.strokeStyle = 'rgba(57,230,255,.95)'; g.lineWidth = 5; g.shadowColor = '#39e6ff'; g.shadowBlur = 12;
+    g.beginPath(); g.moveTo(60, 70); g.lineTo(150, 70); g.stroke(); g.beginPath(); g.moveTo(60, 92); g.lineTo(120, 92); g.stroke();
+    g.fillStyle = '#ff3b30'; g.beginPath(); g.arc(178, 81, 9, 0, 7); g.fill(); }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+function makeGlasses() {
+  const G = new THREE.Group();
+  const frame = new THREE.MeshPhysicalMaterial({ color: 0x0b0d12, roughness: .22, metalness: .1, clearcoat: 1, clearcoatRoughness: .05 });
+  const rimShape = (w, h, r) => { const s = new THREE.Shape(); const x = -w / 2, y = -h / 2;
+    s.moveTo(x + r, y); s.lineTo(x + w - r, y); s.quadraticCurveTo(x + w, y, x + w, y + r); s.lineTo(x + w, y + h - r * .6);
+    s.quadraticCurveTo(x + w, y + h, x + w - r, y + h); s.lineTo(x + r, y + h); s.quadraticCurveTo(x, y + h, x, y + h - r * .6); s.lineTo(x, y + r); s.quadraticCurveTo(x, y, x + r, y); return s; };
+  const lensMats = [];
+  [-1, 1].forEach(side => {
+    const outer = rimShape(.56, .42, .16), inner = rimShape(.46, .32, .12); outer.holes.push(inner);
+    const rimG = new THREE.ExtrudeGeometry(outer, { depth: .07, bevelEnabled: true, bevelThickness: .02, bevelSize: .02, bevelSegments: 3, curveSegments: 18 });
+    const rimM = new THREE.Mesh(rimG, frame); rimM.position.set(side * .33, 0, 0); rimM.castShadow = true; G.add(rimM);
+    const lm = new THREE.MeshPhysicalMaterial({ map: lensTexture(side > 0), emissive: 0xffffff, emissiveMap: lensTexture(side > 0), emissiveIntensity: 0,
+      roughness: .05, metalness: .3, clearcoat: 1, transparent: true, opacity: .93 });
+    lensMats.push(lm);
+    const lens = new THREE.Mesh(new THREE.ShapeGeometry(rimShape(.47, .33, .12), 18), lm); lens.position.set(side * .33, 0, .045);
+    // UVs for ShapeGeometry are in shape units; remap to 0..1
+    const uv = lens.geometry.attributes.uv, pos = lens.geometry.attributes.position;
+    for (let i = 0; i < uv.count; i++) uv.setXY(i, pos.getX(i) / .47 + .5, pos.getY(i) / .33 + .5);
+    G.add(lens);
+    const temple = new THREE.Mesh(new THREE.BoxGeometry(.05, .07, 1.05), frame); temple.position.set(side * .6, .1, -.5); temple.castShadow = true; G.add(temple);
+    const tip = new THREE.Mesh(new THREE.BoxGeometry(.05, .2, .06), frame); tip.position.set(side * .6, .02, -1.02); tip.rotation.x = .4; G.add(tip);
+  });
+  const bridge = new THREE.Mesh(new THREE.TorusGeometry(.09, .025, 10, 24, Math.PI), frame); bridge.position.set(0, .05, .035); G.add(bridge);
+  // camera module + capture LED (right temple hinge, like Meta glasses)
+  const cam = new THREE.Mesh(new THREE.CylinderGeometry(.045, .045, .03, 24), new THREE.MeshPhysicalMaterial({ color: 0x050507, roughness: .05, metalness: .8, clearcoat: 1 }));
+  cam.rotation.x = Math.PI / 2; cam.position.set(-.6, .12, .09); G.add(cam);
+  const ledM = new THREE.MeshBasicMaterial({ color: 0xffffff }); const led = new THREE.Mesh(new THREE.SphereGeometry(.018, 12, 12), ledM); led.position.set(.6, .12, .1); G.add(led);
+  G.userData = { lensMats, ledM, cam };
+  return G;
+}
+
+// ---- the technician (stylised clay figure) ----
+const clay = new THREE.MeshPhysicalMaterial({ color: 0xd9dee8, roughness: .55, metalness: 0, clearcoat: .3 });
+const suit = new THREE.MeshPhysicalMaterial({ color: 0x24324d, roughness: .7, metalness: .05, sheen: 1, sheenColor: new THREE.Color(0x5577aa) });
+const hiviz = new THREE.MeshStandardMaterial({ color: 0xff8a3d, emissive: 0xff6a1d, emissiveIntensity: .6 });
+const person = new THREE.Group(); scene.add(person);
+const body = new THREE.Group(); person.add(body);
+const cap = (r, l, m, p, rot = [0, 0, 0], sc = [1, 1, 1]) => { const x = new THREE.Mesh(new THREE.CapsuleGeometry(r, l, 8, 20), m); x.position.set(...p); x.rotation.set(...rot); x.scale.set(...sc); x.castShadow = x.receiveShadow = true; return x; };
+body.add(cap(.085, .7, suit, [-.11, .47, 0]), cap(.085, .7, suit, [.11, .47, 0]));
+body.add(cap(.2, .42, suit, [0, 1.17, 0], [0, 0, 0], [1, 1, .66]));
+const stripe = new THREE.Mesh(new THREE.CylinderGeometry(.205, .205, .05, 32, 1, true), hiviz); stripe.scale.z = .67; stripe.position.y = 1.08; body.add(stripe);
+const armL = new THREE.Group(), armR = new THREE.Group(); armL.position.set(-.27, 1.42, 0); armR.position.set(.27, 1.42, 0); body.add(armL, armR);
+armL.add(cap(.06, .5, suit, [0, -.3, 0])); armR.add(cap(.06, .5, suit, [0, -.3, 0]));
+armL.add(cap(.05, .05, clay, [0, -.64, 0])); armR.add(cap(.05, .05, clay, [0, -.64, 0]));
+armL.rotation.set(-.15, 0, .08); armR.rotation.set(-.15, 0, -.08);
+const neck = new THREE.Mesh(new THREE.CylinderGeometry(.055, .06, .12, 20), clay); neck.position.y = 1.5; body.add(neck);
+const head = new THREE.Group(); head.position.set(0, 1.63, 0); body.add(head);
+const skull = new THREE.Mesh(new THREE.SphereGeometry(.118, 40, 32), clay); skull.scale.set(.88, 1.08, 1); skull.castShadow = true; head.add(skull);
+const hair = new THREE.Mesh(new THREE.SphereGeometry(.123, 40, 20, 0, Math.PI * 2, 0, 1.25), new THREE.MeshStandardMaterial({ color: 0x1b1b22, roughness: .8 }));
+hair.scale.set(.9, 1.08, 1.02); hair.position.set(0, .012, -.008); hair.rotation.x = -.35; head.add(hair);
+const nose = new THREE.Mesh(new THREE.ConeGeometry(.018, .05, 12), clay); nose.rotation.x = Math.PI / 2; nose.position.set(0, -.015, .118); head.add(nose);
+const glasses = makeGlasses(); glasses.scale.setScalar(.15); glasses.position.set(0, .018, .108); head.add(glasses);
+person.position.set(3.35, -.55, .75); person.rotation.y = -Math.PI / 2 + .08;
+const beam = new THREE.Mesh(new THREE.ConeGeometry(.65, 1.9, 48, 1, true), new THREE.MeshBasicMaterial({ color: 0x39e6ff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+beam.geometry.translate(0, -.95, 0); beam.geometry.rotateX(-Math.PI / 2); scene.add(beam);
+const scanPlane = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ color: 0x39e6ff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
+scanPlane.scale.set(2.2, 1.6, 1); scanPlane.rotation.y = Math.PI / 2; scene.add(scanPlane);
+
+// ---- hero glasses (title / end) ----
+const hero = new THREE.Scene(); hero.background = new THREE.Color(0x02040a); hero.environment = scene.environment;
+hero.add(new THREE.HemisphereLight(0xcfe6ff, 0x0a0f1c, .6));
+const hk = new THREE.DirectionalLight(0xffffff, 2.2); hk.position.set(3, 4, 5); hero.add(hk);
+const hr = new THREE.DirectionalLight(0x39e6ff, 3); hr.position.set(-5, 1, -3); hero.add(hr);
+const hv = new THREE.DirectionalLight(0x8b7bff, 2); hv.position.set(5, -1, -2); hero.add(hv);
+const heroG = makeGlasses(); hero.add(heroG);
+const heroCam = new THREE.PerspectiveCamera(30, 1920 / 1080, .1, 50);
+const halo = new THREE.Mesh(new THREE.RingGeometry(1.25, 1.27, 200), new THREE.MeshBasicMaterial({ color: 0x39e6ff, transparent: true, opacity: .5, blending: THREE.AdditiveBlending }));
+halo.position.z = -1.2; hero.add(halo);
+const heroDust = new THREE.Points(dustGeo, new THREE.PointsMaterial({ size: .04, map: dot, transparent: true, opacity: .7, depthWrite: false, blending: THREE.AdditiveBlending, color: 0x9fdcff }));
+heroDust.scale.setScalar(.5); heroDust.position.set(0, -.9, -2); hero.add(heroDust);
+
+// ---- part control ----
+const homes = {};
+for (const id in parts) parts[id].children.forEach(c => { c.material = c.material.clone(); c.material.userData = { base: c.material.opacity, e0: c.material.emissive ? c.material.emissive.clone() : null, i0: c.material.emissiveIntensity || 0 }; });
+function setParts(t, explodeK, xray, focus, focusId, okK) {
+  const pulse = .5 + .5 * Math.sin(t * 6.5);
+  for (const id in parts) {
+    const p = parts[id], u = p.userData, hit = id === focusId;
+    if (u.split) p.children.forEach((c, i) => { c.userData.home = c.userData.home || c.position.clone(); c.position.copy(c.userData.home).addScaledVector(V(...u.split[i]), explodeK); });
+    else p.position.copy(u.out).multiplyScalar(explodeK);
+    p.children.forEach(c => {
+      const m = c.material, b = m.userData.base;
+      let o = b;
+      if (u.shell) o = b * lerp(1, .08, Math.max(xray, explodeK * .6));
+      if (!hit && focus > 0) o = Math.min(o, lerp(b, u.shell ? .06 : .2, focus));
+      m.opacity = o; m.depthWrite = o > .95; c.castShadow = o > .5;
+      if (m.emissive) {
+        if (hit && focus > 0) { m.emissive.setRGB(lerp(1, .2, okK), lerp(.12, .85, okK), lerp(.08, .5, okK)); m.emissiveIntensity = (.45 + pulse * .9) * focus; }
+        else if (m.userData.e0) { m.emissive.copy(m.userData.e0); m.emissiveIntensity = m.userData.i0; }
+      }
+    });
+  }
+}
+const tmp = V(0, 0, 0);
+function toScreen(v) { tmp.copy(v).project(camera); return [(tmp.x * .5 + .5) * 1920, (-tmp.y * .5 + .5) * 1080, tmp.z]; }
+function partBox(id) { const b = new THREE.Box3().setFromObject(parts[id]); const pts = [];
+  for (const x of [b.min.x, b.max.x]) for (const y of [b.min.y, b.max.y]) for (const z of [b.min.z, b.max.z]) pts.push(toScreen(V(x, y, z)));
+  const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]); return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)]; }
+function labels(t, k, focusId, okK) {
+  for (const id in parts) { const u = parts[id].userData, el = u.el, hit = id === focusId;
+    tmp.copy(u.anchor).add(parts[id].position); tmp.y += root.position.y; const [x, y, z] = toScreen(tmp);
+    el.style.left = x + 'px'; el.style.top = y + 'px';
+    el.className = 'lbl' + (hit ? (okK > .5 ? ' ok' : ' fault') : '');
+    el.textContent = hit ? (okK > .5 ? '✓ 12V battery terminals — fixed' : '⚠ 12V battery · terminals corroded') : u.name;
+    el.style.opacity = z > 1 ? 0 : (hit ? k.hit : k.all); }
+}
+
+// ---- boxes, causes, chain, graph ----
+const boxDefs = [['c-battery12', 'Battery terminal · corrosion', true], ['c-engine', 'Engine · OK', false]];
+boxDefs.forEach(([id, txt, hot]) => { const d = document.createElement('div'); d.className = 'box' + (hot ? ' hot' : ''); d.innerHTML = `<span>${txt}</span>`; d.id = 'bx-' + id; $('boxes').appendChild(d); });
+const causes = [['Corroded 12V terminals', 71], ['Weak / dead 12V battery', 17], ['Starter motor', 7], ['Alternator', 5]];
+$('causes').innerHTML = causes.map(([n, p], i) => `<div class="cause ${i ? '' : 'top'}"><div class="row"><span>${n}</span><em id="cp${i}">0%</em></div><div class="bar"><div id="cb${i}" style="width:0"></div></div></div>`).join('');
+const chain = ['Acid vapour', 'White corrosion', 'High resistance', 'No crank'];
+$('chain').innerHTML = chain.map((c, i) => `${i ? '<span class="a">→</span>' : ''}<span class="c" id="ch${i}">${c}</span>`).join('');
+const gS = [['White crust', 120, 120], ['Battery light', 120, 280], ["Won't crank", 120, 440]];
+const gC = [['12V terminals', 470, 110, 71], ['12V battery', 470, 230, 17], ['Starter', 470, 345, 7], ['Alternator', 470, 455, 5]];
+const gE = [[0, 0, 3], [0, 1, 1.5], [1, 0, 2], [1, 1, 2.5], [1, 3, 2], [2, 0, 2], [2, 1, 2], [2, 2, 2.5]];
+const svg = $('graph').querySelector('svg');
+svg.innerHTML = `<defs><linearGradient id="lg" x1="0" x2="1"><stop offset="0" stop-color="#8b7bff"/><stop offset="1" stop-color="#39e6ff"/></linearGradient>
+  <filter id="gl"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+  <text x="34" y="52" fill="#39e6ff" font-size="17" font-weight="800" letter-spacing="4">KNOWLEDGE GRAPH</text>` +
+  gE.map(([s, c, w], i) => `<path id="ge${i}" d="M${gS[s][1] + 70} ${gS[s][2] + 20} C ${300} ${gS[s][2] + 20}, ${330} ${gC[c][2] + 20}, ${gC[c][1] - 75} ${gC[c][2] + 20}" stroke="url(#lg)" stroke-width="${w}" fill="none" opacity="0" stroke-dasharray="600" stroke-dashoffset="600"/>`).join('') +
+  gS.map(([n, x, y], i) => `<g id="gs${i}" opacity="0"><rect x="${x - 70}" y="${y}" width="140" height="40" rx="20" fill="rgba(52,211,153,.14)" stroke="#34d399"/><text x="${x}" y="${y + 26}" fill="#e8f4ff" font-size="17" font-weight="700" text-anchor="middle">${n}</text></g>`).join('') +
+  gC.map(([n, x, y, p], i) => `<g id="gc${i}" opacity="0"><rect x="${x - 75}" y="${y}" width="150" height="40" rx="12" fill="${i ? 'rgba(57,230,255,.10)' : 'rgba(255,59,48,.25)'}" stroke="${i ? '#39e6ff' : '#ff3b30'}" ${i ? '' : 'filter="url(#gl)"'}/><text x="${x}" y="${y + 26}" fill="#fff" font-size="17" font-weight="700" text-anchor="middle">${n}</text></g>`).join('');
+for (let i = 0; i < 26; i++) $('wave').appendChild(document.createElement('b'));
+
+// grain
+const gctx = $('grain').getContext('2d'), gimg = gctx.createImageData(480, 270);
+function grain() { for (let i = 0; i < gimg.data.length; i += 4) { const v = rnd() * 255; gimg.data[i] = gimg.data[i + 1] = gimg.data[i + 2] = v; gimg.data[i + 3] = 255; } gctx.putImageData(gimg, 0, 0); }
+
+// ---- dialogue (filled by the renderer) ----
+window.LINES = window.LINES || [];
+
+// ---- camera paths ----
+const POV = V(3.13, 1.08, .74), POVLOOK = V(1.62, .2, .62);
+const STEPS = [
+  ['Ignition off. Disconnect the negative (−) terminal first.', 'Say “next” when done', true],
+  ['Clean both terminals with baking soda and a wire brush.', 'Then show me — I’ll check it', false],
+];
+
+window.setT = function (t) {
+  const S = [6, 14, 22, 31, 40, 51.6, 60.2, 67.5];
+  let cam, look, fov = 36, useHero = false, explodeK = 0, xray = 0, focus = 0, okK = 0, personVis = true;
+  let lbl = { all: 0, hit: 0 };
+  const breathe = V(Math.sin(t * 1.3) * .012, Math.sin(t * 1.9) * .01, Math.cos(t * 1.1) * .01);
+
+  if (t < S[0] || t >= S[6]) { // hero glasses
+    useHero = true;
+    const k = t < S[0] ? t / S[0] : (t - S[6]) / (S[7] - S[6]);
+    const a = t < S[0] ? lerp(-.9, .25, eio(clamp(k * 1.05))) : lerp(.35, -.12, eio(k));
+    heroCam.position.set(Math.sin(a) * 4.6, lerp(.6, .15, eio(k)), Math.cos(a) * 4.6); heroCam.lookAt(0, t < S[0] ? lerp(0, -.62, sm(seg(t, 1.4, 3.4))) : -.62, 0);
+    heroG.rotation.set(Math.sin(t * .8) * .05, Math.sin(t * .5) * .08, 0);
+    const on = t < S[0] ? sm(seg(t, 1.2, 2.4)) : 1;
+    heroG.userData.lensMats.forEach(m => m.emissiveIntensity = on * (1.1 + .25 * Math.sin(t * 4)));
+    heroG.userData.ledM.color.setRGB(on, on, on);
+    halo.scale.setScalar(lerp(.6, 1.15, sm(seg(t < S[0] ? t : t - S[6], .5, 3)))); halo.material.opacity = .45 * on;
+    heroDust.rotation.y = t * .03;
+  } else if (t < S[1]) { // third person
+    const k = seg(t, S[0], S[1]);
+    const a = lerp(1.05, .32, eio(seg(t, S[0], 12.6)));
+    const r = lerp(7.4, 4.6, eio(seg(t, S[0], 12.6)));
+    cam = V(1.8 + Math.sin(a) * r, lerp(2.1, 1.45, eio(k)), .4 + Math.cos(a) * r); look = V(lerp(1.4, 2.6, eio(k)), lerp(.35, .7, eio(k)), lerp(.3, .6, k));
+    const p = sm(seg(t, 12.6, S[1])); // fly into the lens
+    const eye = V(3.13, 1.1, .74);
+    cam = vl(cam, eye, p); look = vl(look, POVLOOK, p); fov = lerp(36, 58, p);
+    personVis = p < .82;
+  } else if (t < S[2]) { // POV look
+    cam = POV.clone().add(breathe); look = POVLOOK.clone().add(V(0, Math.sin(t * .7) * .02, 0)); fov = 58; personVis = false;
+    xray = sm(seg(t, 19.2, 21.5));
+  } else if (t < S[3]) { // POV reasoning
+    const k = sm(seg(t, S[2], S[3]));
+    cam = vl(POV, V(2.85, .95, .7), k).add(breathe); look = POVLOOK.clone(); fov = 58; personVis = false; xray = 1; focus = sm(seg(t, 27.6, 29));
+  } else if (t < S[4]) { // exploded
+    const pull = eio(seg(t, S[3], 33.2)), sw = eio(seg(t, 35.6, 39.6));
+    const yaw = lerp(.25, 1.0, seg(t, S[3], S[4]));
+    const orbit = V(Math.sin(yaw) * 9.2, 3.6, Math.cos(yaw) * 9.2);
+    cam = vl(vl(V(2.85, .95, .7), orbit, pull), V(4.4, 2.5, 4.2), sw);
+    look = vl(vl(POVLOOK, V(0, .5, 0), pull), V(1.9, 1.45, 1.72), sw);
+    fov = lerp(lerp(58, 36, pull), 34, sw); personVis = pull > .5; xray = 1 - pull; focus = 1;
+    explodeK = eio(seg(t, 31.6, 33.8)) * (1 - eio(seg(t, 39.4, 40.1)));
+    lbl = { all: sm(seg(t, 33.4, 34.4)) * (1 - sw), hit: sm(seg(t, 33.4, 34.4)) };
+  } else if (t < S[5]) { // guided repair POV
+    cam = V(2.78, .86, .78).add(breathe); look = V(1.6, .22, .62); fov = 54; personVis = false; xray = .85; focus = 1;
+    okK = sm(seg(t, 49.3, 49.9)); lbl = { all: 0, hit: sm(seg(t, 41, 41.8)) * (1 - sm(seg(t, 50.8, 51.4))) };
+  } else { // tutor: wide, slow orbit
+    const yaw = lerp(2.2, 2.9, seg(t, S[5], S[6]));
+    cam = V(Math.sin(yaw) * 10.5, 3.8, Math.cos(yaw) * 10.5); look = V(0, .3, 0); fov = 34; explodeK = .55; xray = .4; focus = 1; okK = 1;
+  }
+
+  // garage objects
+  if (!useHero) {
+    person.visible = personVis;
+    head.rotation.set(t < S[1] ? lerp(.15, .42, sm(seg(t, 7.0, 9))) : .42, t < S[1] ? lerp(-.15, .05, sm(seg(t, 8, 11))) : 0, 0);
+    armR.rotation.x = -.15 - .5 * sm(seg(t, 7.4, 8.4)) * (1 - sm(seg(t, 10.6, 11.6)));
+    const active = sm(seg(t, 7.6, 8.2));
+    glasses.userData.lensMats.forEach(m => m.emissiveIntensity = active * 1.4);
+    const capture = Math.exp(-Math.pow((t - 11.9) / .12, 2));
+    glasses.userData.ledM.color.setRGB(1, 1 - capture * .2, 1 - capture * .2);
+    // beam from the glasses to the engine bay
+    const gp = new THREE.Vector3(); glasses.getWorldPosition(gp);
+    beam.position.copy(gp); beam.lookAt(1.7, .25, .6); beam.scale.set(1, 1, gp.distanceTo(V(1.7, .25, .6)) / 1.9);
+    beam.material.opacity = .18 * sm(seg(t, 11.6, 12.0)) * (1 - sm(seg(t, 12.8, 13.4))) + .25 * capture;
+    blueGlow.position.copy(gp); blueGlow.intensity = 1.2 * active;
+    const sweep = seg(t, 14.8, 17.2);
+    scanPlane.position.set(lerp(2.4, .6, sweep), .3, .35); scanPlane.material.opacity = .12 * Math.sin(Math.PI * sweep);
+    ring.rotation.z = t * .1; ringMat.opacity = .35 + .15 * Math.sin(t * 2);
+    dust.rotation.y = t * .02; dust.position.y = Math.sin(t * .3) * .05;
+    setParts(t, explodeK, xray, focus, 'c-battery12', okK);
+    camera.fov = fov; camera.updateProjectionMatrix(); camera.position.copy(cam); camera.lookAt(look);
+    renderer.render(scene, camera);
+    labels(t, lbl, 'c-battery12', okK);
+  } else {
+    $('labels').querySelectorAll('.lbl').forEach(e => e.style.opacity = 0);
+    renderer.render(hero, heroCam);
+  }
+
+  // ---------- overlays ----------
+  const pov = (t >= 13.6 && t < S[3] + .6) || (t >= S[4] && t < S[5]);
+  const povK = t < S[3] + 1 ? sm(seg(t, 13.6, 14.2)) * (1 - sm(seg(t, 31.0, 31.8))) : sm(seg(t, S[4], S[4] + .5)) * (1 - sm(seg(t, 51.1, 51.6)));
+  show('lens', pov ? povK : 0);
+  show('reticle', fadeIO(t, 14.2, 19.4), 0, 1 + .25 * Math.sin(t * 3));
+  $('scan').style.top = lerp(80, 1000, seg(t, 14.8, 17.2)) + 'px'; show('scan', fadeIO(t, 14.8, 17.3, .2));
+  show('flash', .85 * Math.exp(-Math.pow((t - 14.35) / .09, 2)) + .7 * Math.exp(-Math.pow((t - 49.1) / .09, 2)));
+  show('shot', fadeIO(t, 14.4, 16.0, .2) + fadeIO(t, 49.15, 50.4, .2));
+  show('privacy', fadeIO(t, 15.3, 21.6), 12 * (1 - sm(seg(t, 15.3, 15.8))));
+  show('wake', fadeIO(t, 7.7, 10.8), 10 * (1 - sm(seg(t, 7.7, 8.1))));
+  // detection boxes
+  boxDefs.forEach(([id, , hot], i) => { const el = $('bx-' + id); const o = fadeIO(t, 17.2 + i * .45, hot ? 30.6 : 26.2, .35);
+    if (o > 0 && !useHero) { const [x0, y0, x1, y1] = partBox(id); const pad = 14; Object.assign(el.style, { left: x0 - pad + 'px', top: y0 - pad + 'px', width: x1 - x0 + 2 * pad + 'px', height: y1 - y0 + 2 * pad + 'px' }); }
+    show(el, o, 0, 1 + .15 * (1 - sm(seg(t, 17.2 + i * .45, 17.6 + i * .45)))); });
+  // reasoning
+  const rk = fadeIO(t, 22.6, 31.0, .6);
+  show('panel', rk, 30 * (1 - sm(seg(t, 22.6, 23.3)))); show('graph', rk, 30 * (1 - sm(seg(t, 22.8, 23.5))));
+  $('panel').querySelectorAll('.ev').forEach((e, i) => show(e, sm(seg(t, 23.4 + i * .8, 23.9 + i * .8)), 10 * (1 - sm(seg(t, 23.4 + i * .8, 23.9 + i * .8)))));
+  causes.forEach(([, p], i) => { const k = eio(seg(t, 25.6 + i * .25, 28.4)); $('cb' + i).style.width = p * k + '%'; $('cp' + i).textContent = Math.round(p * k) + '%'; });
+  gS.forEach((_, i) => $('gs' + i).setAttribute('opacity', sm(seg(t, 23.6 + i * .5, 24.1 + i * .5))));
+  gC.forEach((_, i) => $('gc' + i).setAttribute('opacity', sm(seg(t, 24.6 + i * .3, 25.1 + i * .3))));
+  gE.forEach((_, i) => { const e = $('ge' + i), k = sm(seg(t, 25.0 + i * .2, 26.4 + i * .2)); e.setAttribute('opacity', .9 * k); e.setAttribute('stroke-dashoffset', 600 * (1 - k) - (t * 40) % 600 * k * 0); });
+  // exploded
+  show('big', fadeIO(t, 33.6, 39.2), 20 * (1 - sm(seg(t, 33.6, 34.3))));
+  show('chain', fadeIO(t, 35.4, 39.9, .4));
+  chain.forEach((_, i) => show('ch' + i, sm(seg(t, 35.6 + i * .7, 36.1 + i * .7)), 0, lerp(.8, 1, sm(seg(t, 35.6 + i * .7, 36.1 + i * .7)))));
+  // display card
+  const dk = fadeIO(t, 40.6, 51.2);
+  show('display', dk, 30 * (1 - sm(seg(t, 40.6, 41.2))));
+  const st = t < 46 ? 0 : 1, sk = st ? sm(seg(t, 46, 46.4)) : 1;
+  $('dstep').textContent = `${st + 1} / 4`; $('dtext').textContent = STEPS[st][0]; $('dhint').textContent = t > 49.3 ? '✓ Checked by Ustad — terminals clean' : STEPS[st][1];
+  $('dhint').style.color = t > 49.3 ? '#34d399' : ''; show('dsafe', STEPS[st][2] ? 1 : 0); $('dsafe').style.display = STEPS[st][2] ? 'block' : 'none';
+  show('dtext', sk, 8 * (1 - sk));
+  $('display').querySelectorAll('.dots b').forEach((b, i) => b.className = i <= st ? 'on' : '');
+  show('voicecmd', fadeIO(t, 45.1, 46.6, .2), 10 * (1 - sm(seg(t, 45.1, 45.4))));
+  show('verified', fadeIO(t, 49.6, 51.0, .25), 0, lerp(.7, 1, eio(seg(t, 49.6, 49.95))));
+  // tutor
+  show('tutorHead', fadeIO(t, 52.0, 60.0), 20 * (1 - sm(seg(t, 52, 52.6))));
+  show('tutor', t > 51.6 && t < 60.2 ? 1 : 0);
+  ['t1', 't2', 't3'].forEach((id, i) => { const a = 52.8 + i * 1.6; show(id, fadeIO(t, a, 60.0), 40 * (1 - eio(seg(t, a, a + .6)))); });
+  show('badge', fadeIO(t, 57.4, 60.0, .4), 0, lerp(.6, 1, eio(seg(t, 57.4, 57.9))));
+  // titles
+  const titleK = t < S[0] ? sm(seg(t, 1.6, 2.6)) * (1 - sm(seg(t, 5.3, 6))) : sm(seg(t, S[6] + .6, S[6] + 1.6));
+  show('title', titleK, 0, lerp(1.06, 1, sm(seg(t % 60.2, 1.6, 4))));
+  show('tag', t < S[0] ? sm(seg(t, 2.4, 3.2)) : sm(seg(t, 61.4, 62.2)));
+  show('words', t < S[0] ? 0 : sm(seg(t, 62.4, 63.2)), 10 * (1 - sm(seg(t, 62.4, 63.2))));
+  show('meta', t < S[0] ? sm(seg(t, 3.2, 4)) : sm(seg(t, 63.4, 64.2)));
+  // subtitles + waveform
+  const L = t > 60.2 ? null : LINES.find(l => t >= l.t - .1 && t < l.t + l.dur + .35);
+  show('subs', L ? fadeIO(t, L.t - .1, L.t + L.dur + .35, .15) : 0);
+  if (L) {
+    $('who').className = 'who ' + L.who; $('who').textContent = L.who === 'ustad' ? 'USTAD' : 'TECHNICIAN';
+    const words = L.text.split(' '), n = Math.ceil(words.length * clamp((t - L.t) / (L.dur * .92)));
+    $('txt').innerHTML = words.slice(0, n).join(' ') + ' <span class="dim">' + words.slice(n).join(' ') + '</span>';
+    const env = L.env || [], fi = Math.floor((t - L.t) * 30), amp = env[fi] || 0;
+    $('wave').querySelectorAll('b').forEach((b, i) => { const h = 6 + 38 * amp * (.45 + .55 * Math.abs(Math.sin(i * 1.7 + t * 18))); b.style.height = h + 'px';
+      b.style.background = L.who === 'ustad' ? `hsl(${190 + i * 2.4},100%,62%)` : '#fff'; });
+  }
+  // scene dips to black
+  let f = 0; [S[0], 31, S[4], S[5], S[6]].forEach(s => f = Math.max(f, Math.exp(-Math.pow((t - s) / .22, 2)) * (s === 31 ? .0 : .95)));
+  f = Math.max(f, 1 - sm(seg(t, 0, .8)), sm(seg(t, 66.6, 67.5)));
+  show('fade', f);
+  grain();
+  return true;
+};
+setT(0);
+</script>
+</body>
+</html>
