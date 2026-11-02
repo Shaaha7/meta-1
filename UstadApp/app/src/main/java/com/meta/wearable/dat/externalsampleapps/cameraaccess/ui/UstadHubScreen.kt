@@ -353,7 +353,6 @@ internal fun shareFile(context: Context, name: String, mime: String, text: Strin
 }
 
 /** Ustad's reasoning graph (assets/ustad/kb_graph.html), drawn from BrainGraph.reasoningGraph. */
-@android.annotation.SuppressLint("SetJavaScriptEnabled")
 @Composable
 internal fun BrainGraphView(graphJson: String) {
   val rows = remember(graphJson) {
@@ -362,32 +361,8 @@ internal fun BrainGraphView(graphJson: String) {
       maxOf(o.getJSONArray("symptoms").length(), o.getJSONArray("failures").length(), o.getJSONArray("parts").length(), 1)
     }.getOrDefault(6)
   }
-  val js = "graph($graphJson);"
-  androidx.compose.ui.viewinterop.AndroidView(
-      factory = { ctx ->
-        android.webkit.WebView(ctx).apply {
-          settings.javaScriptEnabled = true
-          setBackgroundColor(android.graphics.Color.rgb(7, 12, 24))
-          webViewClient =
-              object : android.webkit.WebViewClient() {
-                override fun onPageFinished(view: android.webkit.WebView, url: String?) {
-                  view.setTag(android.R.id.title, true)
-                  (view.tag as? String)?.let { view.evaluateJavascript(it, null) }
-                }
-              }
-          tag = js
-          loadUrl("file:///android_asset/ustad/kb_graph.html")
-        }
-      },
-      update = { view ->
-        if (view.tag != js) {
-          view.tag = js
-          if (view.getTag(android.R.id.title) == true) view.evaluateJavascript(js, null)
-        }
-      },
-      // Same aspect ratio as the SVG (400 wide, 24 + 40 per row tall) plus the legend.
-      modifier = Modifier.fillMaxWidth().aspectRatio(400f / (24 + rows * 40 + 44)),
-  )
+  // Same aspect ratio as the SVG (400 wide, 24 + 40 per row tall) plus the legend.
+  AssetWebView("kb_graph.html", "graph($graphJson);", Modifier.fillMaxWidth().aspectRatio(400f / (24 + rows * 40 + 44)))
 }
 
 /** Full-screen dark scrolling page used by all Ustad screens. */

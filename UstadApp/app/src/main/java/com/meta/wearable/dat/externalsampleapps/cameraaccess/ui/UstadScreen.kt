@@ -419,39 +419,72 @@ internal fun ExplodedView(
   androidx.compose.runtime.key(url) { ExplodedWebView(url, partIds, partsJson, height) }
 }
 
-@SuppressLint("SetJavaScriptEnabled")
 @Composable
 private fun ExplodedWebView(page: String, partIds: List<String>, partsJson: String?, height: androidx.compose.ui.unit.Dp) {
   val ids = partIds.joinToString(",", "[", "]") { org.json.JSONObject.quote(it) }
   val js = (if (partsJson == null) "" else "build($partsJson); ") + "highlight($ids); explode(true);"
+  AssetWebView(page, js, Modifier.fillMaxWidth().height(height).clip(RoundedCornerShape(10.dp)))
+}
+
+/**
+ * A WebView for Ustad's local pages (assets/ustad) that runs [command] once the page has loaded,
+ * and again whenever it changes.
+ *
+ * Crash fix: the old code remembered "page loaded" with view.setTag(android.R.id.title, ...).
+ * Android only accepts app resource ids there and throws IllegalArgumentException for framework
+ * ids, so the app closed as soon as the 3D view finished loading (right after a diagnosis showed).
+ */
+@SuppressLint("SetJavaScriptEnabled")
+internal class UstadWebView(context: android.content.Context) : WebView(context) {
+  private var loaded = false
+
+  var command: String = ""
+    set(value) {
+      if (field == value) return
+      field = value
+      if (loaded && value.isNotBlank()) evaluateJavascript(value, null)
+    }
+
+  init {
+    settings.javaScriptEnabled = true
+    setBackgroundColor(android.graphics.Color.rgb(7, 12, 24))
+    webChromeClient =
+        object : android.webkit.WebChromeClient() {
+          override fun onConsoleMessage(m: android.webkit.ConsoleMessage): Boolean {
+            android.util.Log.d("Ustad3D", "${m.message()} (${m.sourceId()}:${m.lineNumber()})")
+            return true
+          }
+        }
+    webViewClient =
+        object : WebViewClient() {
+          override fun onPageFinished(view: WebView, url: String?) {
+            loaded = true
+            if (command.isNotBlank()) view.evaluateJavascript(command, null)
+          }
+
+          // If the graphics process dies (low memory, GPU driver), drop this view instead of
+          // letting Android close the whole app.
+          override fun onRenderProcessGone(view: WebView, detail: android.webkit.RenderProcessGoneDetail): Boolean {
+            android.util.Log.w("Ustad3D", "3D view renderer gone (crash=${detail.didCrash()})")
+            (view.parent as? android.view.ViewGroup)?.removeView(view)
+            view.destroy()
+            return true
+          }
+        }
+  }
+}
+
+@Composable
+internal fun AssetWebView(page: String, command: String, modifier: Modifier) {
   AndroidView(
       factory = { ctx ->
-        WebView(ctx).apply {
-          settings.javaScriptEnabled = true
-          setBackgroundColor(android.graphics.Color.rgb(7, 12, 24))
-          webChromeClient = object : android.webkit.WebChromeClient() {
-            override fun onConsoleMessage(m: android.webkit.ConsoleMessage): Boolean {
-              android.util.Log.d("Ustad3D", "${m.message()} (${m.sourceId()}:${m.lineNumber()})"); return true
-            }
-          }
-          // Only run JS once the page is loaded; until then just remember the latest command.
-          webViewClient = object : WebViewClient() {
-            override fun onPageFinished(view: WebView, url: String?) {
-              view.setTag(android.R.id.title, true)
-              (view.tag as? String)?.let { view.evaluateJavascript(it, null) }
-            }
-          }
-          tag = js
+        UstadWebView(ctx).apply {
+          this.command = command
           loadUrl("file:///android_asset/ustad/$page")
         }
       },
-      update = { view ->
-        if (view.tag != js) {
-          view.tag = js
-          if (view.getTag(android.R.id.title) == true) view.evaluateJavascript(js, null)
-        }
-      },
-      modifier = Modifier.fillMaxWidth().height(height).clip(RoundedCornerShape(10.dp)),
+      update = { it.command = command },
+      modifier = modifier,
   )
 }
 
