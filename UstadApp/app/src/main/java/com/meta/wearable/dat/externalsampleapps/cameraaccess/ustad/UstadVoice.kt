@@ -157,6 +157,11 @@ class UstadVoice(context: Context) {
           if (backend.isNotBlank()) setRequestProperty("X-Ustad-Token", BuildConfig.USTAD_APP_TOKEN)
           else setRequestProperty("xi-api-key", elevenKey)
         }
+    DataLog.record(
+        if (backend.isNotBlank()) "Ustad backend (voice)" else "ElevenLabs",
+        "Ustad's reply as text to be spoken (${text.length} characters); none of your audio",
+        text.length,
+    )
     try {
       val body =
           JSONObject()

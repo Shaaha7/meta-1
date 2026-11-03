@@ -122,6 +122,14 @@ private fun UstadHubContent(onClose: () -> Unit, initialVideo: Uri?) {
   // Load the on-device face model now, so the first inspection is faster.
   androidx.compose.runtime.LaunchedEffect(Unit) { com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.PrivacyFilter.warmUp() }
 
+  remember { initDataLog(context) }
+  var consent by remember { mutableStateOf(hasPrivacyConsent(context)) }
+  if (!consent) {
+    BackHandler { onClose() }
+    PrivacyConsentScreen(onAccept = { givePrivacyConsent(context); consent = true })
+    return
+  }
+
   BackHandler(enabled = page != HubPage.Home) { home() }
   BackHandler(enabled = page == HubPage.Home) { onClose() }
 
@@ -389,6 +397,7 @@ private fun HubHome(
     }
 
     if (tab == HubTab.SETTINGS) {
+    DataLogCard(context)
     UstadCard("🗣 Ustad's voice") {
       var natural by remember { mutableStateOf(com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.UstadVoice.isNatural(context)) }
       val hasKey = com.meta.wearable.dat.externalsampleapps.cameraaccess.ustad.UstadVoice.hasElevenLabsKey

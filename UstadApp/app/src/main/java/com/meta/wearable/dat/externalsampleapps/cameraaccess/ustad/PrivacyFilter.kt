@@ -67,7 +67,10 @@ object PrivacyFilter {
             ?: detectLegacy(source)
         val plates = runCatching { detectPlates(source) }.onFailure { Log.w(TAG, "Plate check failed", it) }.getOrDefault(emptyList())
         val boxes = faces + plates
-        if (boxes.isEmpty()) return@withContext PrivacyResult(source, 0)
+        if (boxes.isEmpty()) {
+          DataLog.record(DataLog.ON_PHONE, "Checked the photo for faces and number plates: none found")
+          return@withContext PrivacyResult(source, 0)
+        }
 
         val out = source.copy(Bitmap.Config.ARGB_8888, true) ?: error("Couldn't copy the photo")
         val canvas = Canvas(out)
@@ -81,6 +84,7 @@ object PrivacyFilter {
             crop.recycle(); tiny.recycle(); pixelated.recycle()
           }
         }
+        DataLog.record(DataLog.ON_PHONE, "Blurred ${faces.size} face(s) and ${plates.size} number plate(s) before anything was sent")
         PrivacyResult(out, faces.size, plates.size)
       }
 

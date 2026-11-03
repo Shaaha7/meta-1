@@ -545,7 +545,9 @@ class GeminiClient(
           headers.forEach { (k, v) -> setRequestProperty(k, v) }
         }
     return try {
-      conn.outputStream.use { it.write(body.toString().toByteArray()) }
+      val payload = body.toString()
+      DataLog.record(provider, DataLog.describeAiRequest(payload), payload.length)
+      conn.outputStream.use { it.write(payload.toByteArray()) }
       val code = conn.responseCode
       val text = (if (code in 200..299) conn.inputStream else conn.errorStream)?.bufferedReader()?.use { it.readText() }.orEmpty()
       if (code !in 200..299) {
