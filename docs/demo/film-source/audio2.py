@@ -70,11 +70,21 @@ def riser(d):
     n=int(d*SR); tt=np.arange(n)/SR; f=600+2400*(tt/d)**2
     return np.sin(2*np.pi*np.cumsum(f)/SR)*(tt/d)**2*.5
 add(riser(1.6),0.2,.05); add(riser(2.0),58.4,.06)
+
+# --- footsteps, bonnet latch, gas struts
+def step():
+    n=int(.12*SR); tt=np.arange(n)/SR; return (lp(rng.standard_normal(n),900)*np.exp(-tt*45)+.5*np.sin(2*np.pi*70*tt)*np.exp(-tt*30))
+for i in range(4): add(step(),6.05+i*.34,.5,pan=.2)
+def clunk():
+    n=int(.35*SR); tt=np.arange(n)/SR; return (np.sin(2*np.pi*180*tt)*np.exp(-tt*25)+.6*lp(rng.standard_normal(n),2500)*np.exp(-tt*60))
+add(clunk(),7.98,.55); add(clunk()*.6,9.6,.4)
+n=int(.9*SR); tt=np.arange(n)/SR; hiss=lp(rng.standard_normal(n),3500)*np.sin(np.pi*tt/.9)**2
+add(hiss,8.7,.12)
 # --- UI blips
 def blip(f=1800,d=.09):
     n=int(d*SR); tt=np.arange(n)/SR
     return (np.sin(2*np.pi*f*tt)+.4*np.sin(2*np.pi*f*1.5*tt))*np.exp(-tt*45)
-for s,f in [(7.7,1600),(15.3,2000),(17.2,1500),(17.65,1700),(23.4,1900),(24.2,2100),(25.0,2300),(35.6,1400),(36.3,1500),(37.0,1600),(37.7,1800),
+for s,f in [(9.95,1600),(15.3,2000),(17.2,1500),(17.65,1700),(23.4,1900),(24.2,2100),(25.0,2300),(35.6,1400),(36.3,1500),(37.0,1600),(37.7,1800),
             (40.6,1700),(45.1,2200),(46.0,1700),(52.8,1500),(54.4,1700),(56.0,1900)]:
     add(blip(f),s,.22,pan=rng.uniform(-.4,.4)); add(blip(f*1.5),s+.07,.12)
 def chime():  # success

@@ -454,28 +454,147 @@ function makeGlasses() {
   return G;
 }
 
-// ---- the technician (stylised clay figure) ----
-const clay = new THREE.MeshPhysicalMaterial({ color: 0xd9dee8, roughness: .55, metalness: 0, clearcoat: .3 });
-const suit = new THREE.MeshPhysicalMaterial({ color: 0x24324d, roughness: .7, metalness: .05, sheen: 1, sheenColor: new THREE.Color(0x5577aa) });
-const hiviz = new THREE.MeshStandardMaterial({ color: 0xff8a3d, emissive: 0xff6a1d, emissiveIntensity: .6 });
+// ---- engine bay: the body is opened up so a lifted hood shows the real engine ----
+{
+  const bodyMesh = parts['c-body'].children[0], pm = bodyMesh.material;
+  const p = new THREE.Shape();
+  p.moveTo(-2.18, .3); p.lineTo(WR - .5, .3); p.absarc(WR, WY - .02, .48, Math.PI, 0, true); p.lineTo(.84, .3); p.lineTo(.84, .97);
+  p.quadraticCurveTo(.45, 1.22, .16, 1.38); p.quadraticCurveTo(-.4, 1.46, -1.0, 1.4); p.quadraticCurveTo(-1.45, 1.3, -1.72, 1.03);
+  p.lineTo(-2.08, .97); p.quadraticCurveTo(-2.24, .9, -2.22, .6); p.quadraticCurveTo(-2.22, .36, -2.18, .3);
+  const g = new THREE.ExtrudeGeometry(p, { depth: 1.62, bevelEnabled: true, bevelThickness: .09, bevelSize: .08, bevelSegments: 5, curveSegments: 24 });
+  g.translate(0, 0, -.81); bodyMesh.geometry.dispose(); bodyMesh.geometry = g;
+  const f = new THREE.Shape(); f.moveTo(.84, .3); f.lineTo(WF - .5, .3); f.absarc(WF, WY - .02, .48, Math.PI, 0, true); f.lineTo(2.12, .3);
+  f.quadraticCurveTo(2.26, .32, 2.24, .55); f.quadraticCurveTo(2.22, .78, 2.05, .83); f.lineTo(.84, .97); f.lineTo(.84, .3);
+  const fender = () => new THREE.ExtrudeGeometry(f, { depth: .06, bevelEnabled: true, bevelThickness: .09, bevelSize: .08, bevelSegments: 5, curveSegments: 24 });
+  const add = (geo, mat, pos, rot) => { const m = new THREE.Mesh(geo, mat); m.position.set(...pos); if (rot) m.rotation.set(...rot); m.castShadow = m.receiveShadow = true; parts['c-body'].add(m); return m; };
+  add(fender(), pm, [0, 0, .75]); add(fender(), pm, [0, 0, -.81]);
+  add(rbox(.16, .46, 1.56, .04), pm, [2.1, .56, 0]);                      // front panel behind the grille
+  const inner = std(0x14181f, { roughness: .8, metalness: .2 });
+  add(new THREE.BoxGeometry(1.24, .03, 1.5), inner, [1.46, .29, 0]);       // bay floor
+  add(rbox(.05, .6, 1.5, .02), inner, [.88, .64, 0]);                       // firewall
+  add(rbox(1.1, .26, .05, .02), inner, [1.45, .45, .72]); add(rbox(1.1, .26, .05, .02), inner, [1.45, .45, -.72]); // inner wheel wells
+}
+// hood on its hinge at the windscreen end
+const hoodMesh = parts['c-hood'].children[0];
+hoodMesh.geometry.translate(-.86, -.99, 0); hoodMesh.position.set(.86, .99, 0);
+const strut = new THREE.Mesh(cyl(.008, .62, 8), chrome()); strut.position.set(1.95, .95, .6); strut.visible = false; root.add(strut);
+// battery: moved clear of the fender, with cables and white corrosion on the negative terminal
+const bat = parts['c-battery12'];
+bat.children.forEach(c => c.position.z -= .08);
+const addBat = (geo, mat, pos) => { const m = new THREE.Mesh(geo, mat); m.position.set(...pos); m.castShadow = true; bat.add(m);
+  m.material.userData = { base: m.material.opacity ?? 1 }; return m; };
+addBat(tube([[1.52, .88, .54], [1.5, .98, .44], [1.4, .97, .3], [1.32, .86, .22]], .016), std(0xb3261e, { roughness: .5 }), [0, 0, 0]);
+addBat(tube([[1.68, .88, .54], [1.76, .99, .5], [1.88, .93, .6], [1.92, .62, .64]], .016), std(0x1b1d22, { roughness: .6 }), [0, 0, 0]);
+addBat(new THREE.TorusGeometry(.035, .012, 8, 18), chrome(), [1.68, .875, .54]).rotation.x = Math.PI / 2;
+const crust = [];
+{ let s = 11; const r = () => (s = (s * 16807) % 2147483647) / 2147483647;
+  for (let i = 0; i < 34; i++) {
+    const a = r() * Math.PI * 2, d = .018 + r() * .05, size = .008 + r() * .016;
+    const m = addBat(new THREE.DodecahedronGeometry(size, 0), std(r() < .3 ? 0xcfeadb : 0xf3f6f0, { roughness: 1, metalness: 0 }),
+      [1.68 + Math.cos(a) * d, .875 + r() * .03, .54 + Math.sin(a) * d * .8]);
+    m.rotation.set(r() * 3, r() * 3, r() * 3); crust.push(m);
+  } }
+
+// ---- the technician ----
+const skinM = new THREE.MeshPhysicalMaterial({ color: 0x8d5b3d, roughness: .52, sheen: .5, sheenColor: new THREE.Color(0xffc4a0), clearcoat: .08 });
+const suit = new THREE.MeshPhysicalMaterial({ color: 0x1e2b44, roughness: .8, sheen: 1, sheenRoughness: .55, sheenColor: new THREE.Color(0x5f7aae) });
+const reflect = new THREE.MeshStandardMaterial({ color: 0xdfe4ea, metalness: .7, roughness: .25, emissive: 0x30363c });
+const orange = new THREE.MeshStandardMaterial({ color: 0xff7a2f, roughness: .6, emissive: 0x7a2a00, emissiveIntensity: .4 });
+const gloveM = new THREE.MeshStandardMaterial({ color: 0x4d5663, roughness: .75 });
+const bootM = new THREE.MeshPhysicalMaterial({ color: 0x3b2a1e, roughness: .45, clearcoat: .4 });
+const soleM = new THREE.MeshStandardMaterial({ color: 0x0f1012, roughness: .9 });
+const hairM = new THREE.MeshStandardMaterial({ color: 0x17120f, roughness: .95 });
+const sh = m => { m.castShadow = m.receiveShadow = true; return m; };
+const capM = (r, l, m, p = [0, 0, 0], rot = [0, 0, 0], sc = [1, 1, 1]) => { const x = sh(new THREE.Mesh(new THREE.CapsuleGeometry(r, l, 10, 24), m)); x.position.set(...p); x.rotation.set(...rot); x.scale.set(...sc); return x; };
+const ball = (r, m, p, sc = [1, 1, 1]) => { const x = sh(new THREE.Mesh(new THREE.SphereGeometry(r, 36, 28), m)); x.position.set(...p); x.scale.set(...sc); return x; };
 const person = new THREE.Group(); scene.add(person);
-const body = new THREE.Group(); person.add(body);
-const cap = (r, l, m, p, rot = [0, 0, 0], sc = [1, 1, 1]) => { const x = new THREE.Mesh(new THREE.CapsuleGeometry(r, l, 8, 20), m); x.position.set(...p); x.rotation.set(...rot); x.scale.set(...sc); x.castShadow = x.receiveShadow = true; return x; };
-body.add(cap(.085, .7, suit, [-.11, .47, 0]), cap(.085, .7, suit, [.11, .47, 0]));
-body.add(cap(.2, .42, suit, [0, 1.17, 0], [0, 0, 0], [1, 1, .66]));
-const stripe = new THREE.Mesh(new THREE.CylinderGeometry(.205, .205, .05, 32, 1, true), hiviz); stripe.scale.z = .67; stripe.position.y = 1.08; body.add(stripe);
-const armL = new THREE.Group(), armR = new THREE.Group(); armL.position.set(-.27, 1.42, 0); armR.position.set(.27, 1.42, 0); body.add(armL, armR);
-armL.add(cap(.06, .5, suit, [0, -.3, 0])); armR.add(cap(.06, .5, suit, [0, -.3, 0]));
-armL.add(cap(.05, .05, clay, [0, -.64, 0])); armR.add(cap(.05, .05, clay, [0, -.64, 0]));
-armL.rotation.set(-.15, 0, .08); armR.rotation.set(-.15, 0, -.08);
-const neck = new THREE.Mesh(new THREE.CylinderGeometry(.055, .06, .12, 20), clay); neck.position.y = 1.5; body.add(neck);
-const head = new THREE.Group(); head.position.set(0, 1.63, 0); body.add(head);
-const skull = new THREE.Mesh(new THREE.SphereGeometry(.118, 40, 32), clay); skull.scale.set(.88, 1.08, 1); skull.castShadow = true; head.add(skull);
-const hair = new THREE.Mesh(new THREE.SphereGeometry(.123, 40, 20, 0, Math.PI * 2, 0, 1.25), new THREE.MeshStandardMaterial({ color: 0x1b1b22, roughness: .8 }));
-hair.scale.set(.9, 1.08, 1.02); hair.position.set(0, .012, -.008); hair.rotation.x = -.35; head.add(hair);
-const nose = new THREE.Mesh(new THREE.ConeGeometry(.018, .05, 12), clay); nose.rotation.x = Math.PI / 2; nose.position.set(0, -.015, .118); head.add(nose);
-const glasses = makeGlasses(); glasses.scale.setScalar(.15); glasses.position.set(0, .018, .108); head.add(glasses);
-person.position.set(3.35, -.55, .75); person.rotation.y = -Math.PI / 2 + .08;
+const hips = new THREE.Group(); hips.position.y = .94; person.add(hips);
+// torso (lathe profile, flattened front-to-back)
+const torsoG = new THREE.LatheGeometry([[0, -.05], [.165, -.03], [.172, .06], [.158, .18], [.172, .32], [.198, .44], [.19, .52], [.13, .58], [.06, .61]].map(([r, y]) => new THREE.Vector2(r, y)), 40);
+const torso = sh(new THREE.Mesh(torsoG, suit)); torso.scale.z = .64; hips.add(torso);
+const band = (y, r, h, m) => { const b = new THREE.Mesh(new THREE.CylinderGeometry(r, r, h, 40, 1, true), m); b.scale.z = .645; b.position.y = y; hips.add(b); return b; };
+band(.0, .168, .045, soleM); band(.3, .168, .03, reflect); band(.27, .167, .012, orange); band(.33, .169, .012, orange);
+const buckle = new THREE.Mesh(rbox(.05, .035, .02, .006), chrome()); buckle.position.set(0, 0, .108); hips.add(buckle);
+const zip = new THREE.Mesh(new THREE.BoxGeometry(.006, .5, .006), chrome()); zip.position.set(0, .3, .104); zip.rotation.x = -.05; hips.add(zip);
+[[-.08, .42], [.08, .42]].forEach(([x, y]) => { const pk = sh(new THREE.Mesh(rbox(.085, .08, .02, .008), suit)); pk.position.set(x, y, .116); hips.add(pk); });
+const collar = new THREE.Mesh(new THREE.TorusGeometry(.075, .022, 10, 30), suit); collar.rotation.x = Math.PI / 2; collar.position.y = .6; collar.scale.y = .7; hips.add(collar);
+const neck = sh(new THREE.Mesh(new THREE.CylinderGeometry(.05, .056, .12, 24), skinM)); neck.position.y = .66; hips.add(neck);
+const head = new THREE.Group(); head.position.set(0, .8, .01); hips.add(head);
+head.add(ball(.104, skinM, [0, 0, 0], [.9, 1.12, 1]));
+head.add(ball(.07, skinM, [0, -.06, .035], [1.05, .85, 1]));                 // jaw
+head.add(ball(.073, hairM, [0, -.065, .04], [1.12, .8, .95]));               // short beard
+const scalp = sh(new THREE.Mesh(new THREE.SphereGeometry(.108, 36, 20, 0, Math.PI * 2, 0, 1.2), hairM)); scalp.scale.set(.92, 1.1, 1.03); scalp.rotation.x = -.3; head.add(scalp);
+[-1, 1].forEach(s => { head.add(ball(.022, skinM, [s * .093, -.005, -.005], [.45, 1, .8])); });   // ears
+const nose = sh(new THREE.Mesh(new THREE.ConeGeometry(.016, .045, 14), skinM)); nose.rotation.x = Math.PI / 2 - .2; nose.position.set(0, -.012, .105); head.add(nose);
+[-1, 1].forEach(s => { const b = new THREE.Mesh(new THREE.BoxGeometry(.03, .007, .008), hairM); b.position.set(s * .033, .04, .1); b.rotation.z = -s * .12; head.add(b); });
+const glasses = makeGlasses(); glasses.scale.setScalar(.14); glasses.position.set(0, .016, .1); head.add(glasses);
+// arms: shoulder → elbow → gloved hand
+function arm(side) {
+  const sh0 = new THREE.Group(); sh0.position.set(side * .205, .5, 0); hips.add(sh0);
+  sh0.add(ball(.06, suit, [0, 0, 0]));
+  sh0.add(capM(.054, .24, suit, [0, -.16, 0]));
+  const st = new THREE.Mesh(new THREE.CylinderGeometry(.057, .057, .022, 24, 1, true), reflect); st.position.y = -.2; sh0.add(st);
+  const el = new THREE.Group(); el.position.y = -.32; sh0.add(el);
+  el.add(capM(.046, .22, suit, [0, -.13, 0]));
+  const hand = new THREE.Group(); hand.position.y = -.28; el.add(hand);
+  hand.add(capM(.036, .05, gloveM, [0, -.03, 0], [0, 0, 0], [1, 1, .62]));
+  hand.add(capM(.014, .04, gloveM, [side * -.035, -.01, .015], [0, 0, side * .5]));
+  const cuff = new THREE.Mesh(new THREE.CylinderGeometry(.04, .04, .03, 20), orange); cuff.position.y = .01; hand.add(cuff);
+  return { sh: sh0, el };
+}
+const armL = arm(-1), armR = arm(1);
+function leg(side) {
+  const hp = new THREE.Group(); hp.position.set(side * .095, .94, 0); person.add(hp);
+  hp.add(capM(.074, .34, suit, [0, -.22, 0]));
+  const kn = new THREE.Group(); kn.position.y = -.45; hp.add(kn);
+  kn.add(capM(.06, .34, suit, [0, -.2, 0]));
+  const st = new THREE.Mesh(new THREE.CylinderGeometry(.063, .063, .025, 24, 1, true), reflect); st.position.y = -.12; kn.add(st);
+  const boot = sh(new THREE.Mesh(rbox(.1, .1, .25, .04), bootM)); boot.position.set(0, -.43, .045); kn.add(boot);
+  const sole = sh(new THREE.Mesh(rbox(.105, .025, .26, .01), soleM)); sole.position.set(0, -.485, .045); kn.add(sole);
+  return { hp, kn };
+}
+const legL = leg(-1), legR = leg(1);
+const STAND = V(2.7, -.55, .42);
+person.position.copy(STAND); person.rotation.y = -Math.PI / 2;
+
+/** Poses the technician for time t: walk in, open the bonnet, lean over the engine. */
+function posePerson(t) {
+  const W0 = 6.0, W1 = 7.45;
+  const start = V(4.9, -.55, 2.0);
+  const w = seg(t, W0, W1), we = 1 - Math.pow(1 - w, 2);
+  if (t < W1) {
+    person.position.copy(vl(start, STAND, we));
+    const dir = STAND.clone().sub(start); person.rotation.y = Math.atan2(dir.x, dir.z);
+  } else {
+    person.position.copy(STAND);
+    person.rotation.y = lerp(Math.atan2(STAND.x - start.x, STAND.z - start.z), -Math.PI / 2, sm(seg(t, W1, 7.75)));
+  }
+  const walking = t < W1 ? 1 - sm(seg(t, W1 - .25, W1)) : 0;
+  const ph = (t - W0) * 9.2, sw = Math.sin(ph) * walking;
+  legL.hp.rotation.x = sw * .42; legR.hp.rotation.x = -sw * .42;
+  legL.kn.rotation.x = Math.max(0, -Math.sin(ph)) * .7 * walking; legR.kn.rotation.x = Math.max(0, Math.sin(ph)) * .7 * walking;
+  person.position.y = -.55 + Math.abs(Math.cos(ph)) * .018 * walking;
+  // bonnet: reach (7.6–8.0), lift (8.0–8.7), let the struts take it (8.7–9.6), lean over and look (9.4–10.2)
+  const reach = sm(seg(t, 7.55, 8.0)), lift = sm(seg(t, 8.0, 8.7)), letgo = sm(seg(t, 8.75, 9.4)), rest = sm(seg(t, 9.3, 10.1));
+  hips.rotation.x = lerp(lerp(0, .5, reach), .32, lift) * (1 - rest) + .36 * rest;
+  const shX = -.1 - 1.05 * reach - .75 * lift * (1 - letgo) + .25 * letgo;
+  const restX = -1.05;
+  [armL, armR].forEach((a, i) => {
+    const swing = (i ? -1 : 1) * sw * .35;
+    a.sh.rotation.x = lerp(shX + swing, restX, rest);
+    a.sh.rotation.z = (i ? -1 : 1) * lerp(.06, .16, reach);
+    a.el.rotation.x = lerp(-.25 * reach - .15, -.55, rest);
+  });
+  head.rotation.x = lerp(lerp(.05, .25, reach), .38, rest);
+  head.rotation.y = lerp(0, .08, rest);
+}
+function hoodAngle(t) {
+  if (t < 31.5) return .5 * sm(seg(t, 8.0, 8.7)) * 0 + lerp(0, .42, sm(seg(t, 8.0, 8.7))) + (1.1 - .42) * eio(seg(t, 8.7, 9.6));
+  if (t < 40) return 1.1 * (1 - eio(seg(t, 31.5, 32.6)));
+  if (t < 51.6) return 1.1;
+  return 0;
+}
+
 const beam = new THREE.Mesh(new THREE.ConeGeometry(.65, 1.9, 48, 1, true), new THREE.MeshBasicMaterial({ color: 0x39e6ff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
 beam.geometry.translate(0, -.95, 0); beam.geometry.rotateX(-Math.PI / 2); scene.add(beam);
 const scanPlane = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ color: 0x39e6ff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
@@ -518,7 +637,7 @@ function setParts(t, explodeK, xray, focus, focusId, okK) {
 }
 const tmp = V(0, 0, 0);
 function toScreen(v) { tmp.copy(v).project(camera); return [(tmp.x * .5 + .5) * 1920, (-tmp.y * .5 + .5) * 1080, tmp.z]; }
-function partBox(id) { const b = new THREE.Box3().setFromObject(parts[id]); const pts = [];
+function partBox(id) { const b = new THREE.Box3(); parts[id].children.forEach(c => { if (c.geometry.type !== 'TubeGeometry' && c.geometry.type !== 'DodecahedronGeometry') b.expandByObject(c); }); const pts = [];
   for (const x of [b.min.x, b.max.x]) for (const y of [b.min.y, b.max.y]) for (const z of [b.min.z, b.max.z]) pts.push(toScreen(V(x, y, z)));
   const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]); return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)]; }
 function labels(t, k, focusId, okK) {
@@ -531,7 +650,7 @@ function labels(t, k, focusId, okK) {
 }
 
 // ---- boxes, causes, chain, graph ----
-const boxDefs = [['c-battery12', 'Battery terminal · corrosion', true], ['c-engine', 'Engine · OK', false]];
+const boxDefs = [['c-battery12', '− terminal · white corrosion', true], ['c-engine', 'Engine · OK', false]];
 boxDefs.forEach(([id, txt, hot]) => { const d = document.createElement('div'); d.className = 'box' + (hot ? ' hot' : ''); d.innerHTML = `<span>${txt}</span>`; d.id = 'bx-' + id; $('boxes').appendChild(d); });
 const causes = [['Corroded 12V terminals', 71], ['Weak / dead 12V battery', 17], ['Starter motor', 7], ['Alternator', 5]];
 $('causes').innerHTML = causes.map(([n, p], i) => `<div class="cause ${i ? '' : 'top'}"><div class="row"><span>${n}</span><em id="cp${i}">0%</em></div><div class="bar"><div id="cb${i}" style="width:0"></div></div></div>`).join('');
@@ -557,7 +676,7 @@ function grain() { for (let i = 0; i < gimg.data.length; i += 4) { const v = rnd
 window.LINES = window.LINES || [];
 
 // ---- camera paths ----
-const POV = V(3.13, 1.08, .74), POVLOOK = V(1.62, .2, .62);
+const POVLOOK = V(1.62, .24, .5); let EYE = V(2.5, 1.05, .42), POV = EYE.clone();
 const STEPS = [
   ['Ignition off. Disconnect the negative (−) terminal first.', 'Say “next” when done', true],
   ['Clean both terminals with baking soda and a wire brush.', 'Then show me — I’ll check it', false],
@@ -568,6 +687,11 @@ window.setT = function (t) {
   let cam, look, fov = 36, useHero = false, explodeK = 0, xray = 0, focus = 0, okK = 0, personVis = true;
   let lbl = { all: 0, hit: 0 };
   const breathe = V(Math.sin(t * 1.3) * .012, Math.sin(t * 1.9) * .01, Math.cos(t * 1.1) * .01);
+  posePerson(Math.min(t, 13.99)); person.updateMatrixWorld(true);
+  EYE = new THREE.Vector3(); glasses.getWorldPosition(EYE); EYE.add(V(.32, .26, -.02));
+  POV = EYE.clone();
+  const NEAR = vl(EYE, POVLOOK, .16);
+  hoodMesh.rotation.z = hoodAngle(t);
 
   if (t < S[0] || t >= S[6]) { // hero glasses
     useHero = true;
@@ -580,32 +704,30 @@ window.setT = function (t) {
     heroG.userData.ledM.color.setRGB(on, on, on);
     halo.scale.setScalar(lerp(.6, 1.15, sm(seg(t < S[0] ? t : t - S[6], .5, 3)))); halo.material.opacity = .45 * on;
     heroDust.rotation.y = t * .03;
-  } else if (t < S[1]) { // third person
+  } else if (t < S[1]) { // third person: walk in, open the bonnet, ask
     const k = seg(t, S[0], S[1]);
-    const a = lerp(1.05, .32, eio(seg(t, S[0], 12.6)));
-    const r = lerp(7.4, 4.6, eio(seg(t, S[0], 12.6)));
-    cam = V(1.8 + Math.sin(a) * r, lerp(2.1, 1.45, eio(k)), .4 + Math.cos(a) * r); look = V(lerp(1.4, 2.6, eio(k)), lerp(.35, .7, eio(k)), lerp(.3, .6, k));
-    const p = sm(seg(t, 12.6, S[1])); // fly into the lens
-    const eye = V(3.13, 1.1, .74);
-    cam = vl(cam, eye, p); look = vl(look, POVLOOK, p); fov = lerp(36, 58, p);
-    personVis = p < .82;
+    const a = lerp(1.15, .55, eio(seg(t, S[0], 13.2)));
+    const r = lerp(7.6, 4.4, eio(seg(t, S[0], 13.2)));
+    cam = V(2.0 + Math.sin(a) * r, lerp(2.3, 1.6, eio(k)), .2 + Math.cos(a) * r); look = V(lerp(2.4, 2.2, eio(k)), lerp(.4, .55, eio(k)), lerp(.9, .5, k));
+    const p = sm(seg(t, 13.2, S[1])); // fly into the lens
+    cam = vl(cam, EYE, p); look = vl(look, POVLOOK, p); fov = lerp(36, 62, p);
+    personVis = p < .85;
   } else if (t < S[2]) { // POV look
-    cam = POV.clone().add(breathe); look = POVLOOK.clone().add(V(0, Math.sin(t * .7) * .02, 0)); fov = 58; personVis = false;
-    xray = sm(seg(t, 19.2, 21.5));
+    cam = POV.clone().add(breathe); look = POVLOOK.clone().add(V(0, Math.sin(t * .7) * .02, 0)); fov = 62; personVis = false;
   } else if (t < S[3]) { // POV reasoning
     const k = sm(seg(t, S[2], S[3]));
-    cam = vl(POV, V(2.85, .95, .7), k).add(breathe); look = POVLOOK.clone(); fov = 58; personVis = false; xray = 1; focus = sm(seg(t, 27.6, 29));
+    cam = vl(POV, NEAR, k).add(breathe); look = POVLOOK.clone(); fov = 62; personVis = false; focus = .75 * sm(seg(t, 27.6, 29));
   } else if (t < S[4]) { // exploded
     const pull = eio(seg(t, S[3], 33.2)), sw = eio(seg(t, 35.6, 39.6));
     const yaw = lerp(.25, 1.0, seg(t, S[3], S[4]));
     const orbit = V(Math.sin(yaw) * 9.2, 3.6, Math.cos(yaw) * 9.2);
-    cam = vl(vl(V(2.85, .95, .7), orbit, pull), V(4.4, 2.5, 4.2), sw);
+    cam = vl(vl(NEAR, orbit, pull), V(4.4, 2.5, 4.2), sw);
     look = vl(vl(POVLOOK, V(0, .5, 0), pull), V(1.9, 1.45, 1.72), sw);
-    fov = lerp(lerp(58, 36, pull), 34, sw); personVis = pull > .5; xray = 1 - pull; focus = 1;
+    fov = lerp(lerp(62, 36, pull), 34, sw); personVis = pull > .5; focus = lerp(.75, 1, pull);
     explodeK = eio(seg(t, 31.6, 33.8)) * (1 - eio(seg(t, 39.4, 40.1)));
     lbl = { all: sm(seg(t, 33.4, 34.4)) * (1 - sw), hit: sm(seg(t, 33.4, 34.4)) };
   } else if (t < S[5]) { // guided repair POV
-    cam = V(2.78, .86, .78).add(breathe); look = V(1.6, .22, .62); fov = 54; personVis = false; xray = .85; focus = 1;
+    cam = NEAR.clone().add(breathe); look = V(1.62, .22, .5); fov = 56; personVis = false; focus = .6;
     okK = sm(seg(t, 49.3, 49.9)); lbl = { all: 0, hit: sm(seg(t, 41, 41.8)) * (1 - sm(seg(t, 50.8, 51.4))) };
   } else { // tutor: wide, slow orbit
     const yaw = lerp(2.2, 2.9, seg(t, S[5], S[6]));
@@ -615,16 +737,15 @@ window.setT = function (t) {
   // garage objects
   if (!useHero) {
     person.visible = personVis;
-    head.rotation.set(t < S[1] ? lerp(.15, .42, sm(seg(t, 7.0, 9))) : .42, t < S[1] ? lerp(-.15, .05, sm(seg(t, 8, 11))) : 0, 0);
-    armR.rotation.x = -.15 - .5 * sm(seg(t, 7.4, 8.4)) * (1 - sm(seg(t, 10.6, 11.6)));
-    const active = sm(seg(t, 7.6, 8.2));
+    crust.forEach(m => m.visible = !(t > 49.3 && t < 51.6) && t < 60);
+    const active = sm(seg(t, 9.9, 10.4));
     glasses.userData.lensMats.forEach(m => m.emissiveIntensity = active * 1.4);
-    const capture = Math.exp(-Math.pow((t - 11.9) / .12, 2));
+    const capture = Math.exp(-Math.pow((t - 13.0) / .12, 2));
     glasses.userData.ledM.color.setRGB(1, 1 - capture * .2, 1 - capture * .2);
     // beam from the glasses to the engine bay
     const gp = new THREE.Vector3(); glasses.getWorldPosition(gp);
-    beam.position.copy(gp); beam.lookAt(1.7, .25, .6); beam.scale.set(1, 1, gp.distanceTo(V(1.7, .25, .6)) / 1.9);
-    beam.material.opacity = .18 * sm(seg(t, 11.6, 12.0)) * (1 - sm(seg(t, 12.8, 13.4))) + .25 * capture;
+    beam.position.copy(gp); beam.lookAt(1.65, .25, .5); beam.scale.set(.7, .7, gp.distanceTo(V(1.65, .25, .5)) / 1.9);
+    beam.material.opacity = (.18 * sm(seg(t, 12.6, 12.9)) * (1 - sm(seg(t, 13.3, 13.8))) + .25 * capture) * (personVis ? 1 : 0);
     blueGlow.position.copy(gp); blueGlow.intensity = 1.2 * active;
     const sweep = seg(t, 14.8, 17.2);
     scanPlane.position.set(lerp(2.4, .6, sweep), .3, .35); scanPlane.material.opacity = .12 * Math.sin(Math.PI * sweep);
@@ -648,7 +769,7 @@ window.setT = function (t) {
   show('flash', .85 * Math.exp(-Math.pow((t - 14.35) / .09, 2)) + .7 * Math.exp(-Math.pow((t - 49.1) / .09, 2)));
   show('shot', fadeIO(t, 14.4, 16.0, .2) + fadeIO(t, 49.15, 50.4, .2));
   show('privacy', fadeIO(t, 15.3, 21.6), 12 * (1 - sm(seg(t, 15.3, 15.8))));
-  show('wake', fadeIO(t, 7.7, 10.8), 10 * (1 - sm(seg(t, 7.7, 8.1))));
+  show('wake', fadeIO(t, 9.95, 12.6), 10 * (1 - sm(seg(t, 9.95, 10.3))));
   // detection boxes
   boxDefs.forEach(([id, , hot], i) => { const el = $('bx-' + id); const o = fadeIO(t, 17.2 + i * .45, hot ? 30.6 : 26.2, .35);
     if (o > 0 && !useHero) { const [x0, y0, x1, y1] = partBox(id); const pad = 14; Object.assign(el.style, { left: x0 - pad + 'px', top: y0 - pad + 'px', width: x1 - x0 + 2 * pad + 'px', height: y1 - y0 + 2 * pad + 'px' }); }
