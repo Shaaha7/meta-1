@@ -18,3 +18,4 @@ Trust by design: faces are blurred on the phone before anything is sent. For car
 | `Ustad_Project_Overview.pdf` | Project overview |
 | [`docs/Ustad_Guide.pdf`](docs/Ustad_Guide.pdf) | **Guide:** how every feature works, install and use the app, demo script |
 | [`docs/demo/ustad-demo.mp4`](docs/demo/ustad-demo.mp4) | **Demo film** (67 s, 1080p, voiced; v2: the technician opens the bonnet) |
+| [`docs/demo/ustad-prototype-walkthrough.mp4`](docs/demo/ustad-prototype-walkthrough.mp4) | **Prototype walkthrough** (107 s): the app's real screens (v2.7) and 3D, step by step, with voice-over |
