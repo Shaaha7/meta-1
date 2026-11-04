@@ -115,6 +115,18 @@
   #fade { background: #000; opacity: 0; }
   #bars::before, #bars::after { content: ""; position: absolute; left: 0; right: 0; height: 0; background: #000; }
   #grain { opacity: .06; mix-blend-mode: overlay; }
+
+  #lenschip { left: 50%; top: 150px; transform: translateX(-50%); }
+  #dash { left: 160px; right: 160px; top: 150px; padding: 36px 44px; display: grid; grid-template-columns: 1.15fr 1fr; grid-template-rows: auto 1fr; gap: 26px 40px; }
+  #dash .dh { grid-column: 1 / 3; display: flex; justify-content: space-between; align-items: center; }
+  #dash .dh .k { font-size: 17px; letter-spacing: .3em; color: var(--c); font-weight: 800; } #dash .dh .h { font-size: 40px; font-weight: 900; margin-top: 6px; }
+  #dash .col h4 { margin: 0 0 12px; font-size: 15px; letter-spacing: .24em; color: var(--mut); font-weight: 800; }
+  .trow { display: grid; grid-template-columns: 1fr auto auto; gap: 18px; align-items: center; padding: 20px 18px; border-radius: 14px; background: rgba(255,255,255,.04); margin-bottom: 10px; font-size: 21px; }
+  .trow b { font-weight: 800; } .bdg { font-size: 15px; font-weight: 900; padding: 6px 10px; border-radius: 8px; background: rgba(251,191,36,.18); color: #fbbf24; }
+  .bdg.help { background: rgba(255,59,48,.18); color: #ff6b61; } .bdg.ok { background: rgba(52,211,153,.16); color: var(--g); } .sc { color: var(--mut); font-size: 18px; }
+  .fault { margin-bottom: 14px; } .fault .row { display: flex; justify-content: space-between; font-size: 20px; font-weight: 600; }
+  .job { font-size: 18px; color: #cfe0f2; padding: 9px 0; border-bottom: 1px solid rgba(255,255,255,.07); } .job em { font-style: normal; color: var(--g); font-weight: 700; }
+  #callx { display: inline-block; margin-top: 16px; font-size: 20px; font-weight: 800; padding: 12px 20px; border-radius: 30px; background: linear-gradient(90deg, #25d366, #1aa851); color: #03140a; box-shadow: 0 0 30px rgba(37,211,102,.45); }
 </style>
 </head>
 <body>
@@ -157,6 +169,27 @@
     <div class="d">Step by step in their language, checked by photo, then quizzed.</div></div>
 </div>
 <div id="badge" class="glass"><div class="medal">★</div><div><div class="bt">SKILL PASSPORT</div><div class="bn">12V battery service · 92%</div></div></div>
+<div id="lenschip" class="chip">🕶 <b>Ray-Ban Display</b> · the step appears in his lens</div>
+<div id="dash" class="glass">
+  <div class="dh"><div><div class="k">SUPERVISOR · TEAM DASHBOARD</div><div class="h">Who can do the job, and what keeps breaking</div></div><div class="sc">demo data · shared as one file</div></div>
+  <div class="col"><h4>TECHNICIANS · SKILL PASSPORT</h4>
+    <div class="trow" id="dr0"><b>Ahmed K.</b><span class="bdg">★ 12V battery · 92</span><span class="sc">today</span></div>
+    <div class="trow" id="dr1"><b>Ravi P.</b><span class="bdg">★ Tyre check · 88</span><span class="sc">2 jobs</span></div>
+    <div class="trow" id="dr2"><b>Joseph M.</b><span class="bdg ok">learning · 64</span><span class="sc">lesson 2/3</span></div>
+    <div class="trow" id="dr3"><b>Imran S.</b><span class="bdg help">needs help</span><span class="sc">coolant leak</span></div>
+  </div>
+  <div class="col"><h4>MOST COMMON FAULTS</h4>
+    <div class="fault"><div class="row"><span>Battery terminals</span><em id="fp0">0%</em></div><div class="bar"><div id="fb0" style="width:0"></div></div></div>
+    <div class="fault"><div class="row"><span>Tyres</span><em id="fp1">0%</em></div><div class="bar"><div id="fb1" style="width:0"></div></div></div>
+    <div class="fault"><div class="row"><span>Coolant leaks</span><em id="fp2">0%</em></div><div class="bar"><div id="fb2" style="width:0"></div></div></div>
+    <div class="fault"><div class="row"><span>Brakes</span><em id="fp3">0%</em></div><div class="bar"><div id="fb3" style="width:0"></div></div></div>
+    <h4 style="margin-top:18px">RECENT JOBS</h4>
+    <div class="job" id="jb0">Toyota Corolla · 12V terminals · <em>fixed, verified by photo</em></div>
+    <div class="job" id="jb1">Nissan Sunny · tyre puncture · <em>fixed</em></div>
+    <div class="job" id="jb2">Split AC · drain line · <em>fixed</em></div>
+    <div id="callx">📞 Call the expert on WhatsApp</div>
+  </div>
+</div>
 <div id="title" class="layer"><div id="titlewrap">
   <div class="logo">USTAD</div><div class="tag" id="tag">The master technician in your glasses</div>
   <div class="words" id="words"><span>INSPECT</span><span>EXPLAIN</span><span>TEACH</span></div>
@@ -682,8 +715,24 @@ const STEPS = [
   ['Clean both terminals with baking soda and a wire brush.', 'Then show me — I’ll check it', false],
 ];
 
+// Ray-Ban Display: what the right lens shows during the close-up
+const lensCanvas = document.createElement('canvas'); lensCanvas.width = 512; lensCanvas.height = 360;
+const lensTex = new THREE.CanvasTexture(lensCanvas); lensTex.colorSpace = THREE.SRGBColorSpace;
+{ const g = lensCanvas.getContext('2d');
+  g.fillStyle = '#05080f'; g.fillRect(0, 0, 512, 360);
+  g.fillStyle = 'rgba(20,26,38,.95)'; g.beginPath(); g.roundRect(150, 70, 300, 210, 26); g.fill();
+  g.strokeStyle = 'rgba(255,255,255,.25)'; g.lineWidth = 3; g.stroke();
+  g.fillStyle = '#fbbf24'; g.beginPath(); g.roundRect(172, 92, 186, 34, 8); g.fill();
+  g.fillStyle = '#1a1200'; g.font = '900 20px Inter'; g.fillText('⚠ SAFETY STOP', 182, 116);
+  g.fillStyle = '#8aa0c0'; g.font = '700 20px Inter'; g.fillText('1 / 4', 392, 116);
+  g.fillStyle = '#ffffff'; g.font = '800 30px Inter'; g.fillText('Ignition off.', 172, 170); g.fillText('Disconnect − first', 172, 208);
+  g.fillStyle = '#ff3b30'; g.beginPath(); g.roundRect(172, 232, 46, 30, 6); g.fill(); g.fillStyle = '#39e6ff'; g.font = '700 20px Inter'; g.fillText('12V battery', 230, 256);
+  lensTex.needsUpdate = true; }
+const lensM = glasses.userData.lensMats[0], lensMap0 = lensM.map, lensEm0 = lensM.emissiveMap;
+const MACRO = [42.9, 45.0], DASH = 60.2;
+
 window.setT = function (t) {
-  const S = [6, 14, 22, 31, 40, 51.6, 60.2, 67.5];
+  const S = [6, 14, 22, 31, 40, 51.6, 67, 74.5];
   let cam, look, fov = 36, useHero = false, explodeK = 0, xray = 0, focus = 0, okK = 0, personVis = true;
   let lbl = { all: 0, hit: 0 };
   const breathe = V(Math.sin(t * 1.3) * .012, Math.sin(t * 1.9) * .01, Math.cos(t * 1.1) * .01);
@@ -729,8 +778,16 @@ window.setT = function (t) {
   } else if (t < S[5]) { // guided repair POV
     cam = NEAR.clone().add(breathe); look = V(1.62, .22, .5); fov = 56; personVis = false; focus = .6;
     okK = sm(seg(t, 49.3, 49.9)); lbl = { all: 0, hit: sm(seg(t, 41, 41.8)) * (1 - sm(seg(t, 50.8, 51.4))) };
+    if (t >= MACRO[0] && t < MACRO[1]) { // close-up of the Ray-Ban Display lens on his face
+      const gp = new THREE.Vector3(); glasses.getWorldPosition(gp);
+      const q = new THREE.Quaternion(); glasses.getWorldQuaternion(q);
+      const fwd = V(0, 0, 1).applyQuaternion(q), up = V(0, 1, 0).applyQuaternion(q), side = V(1, 0, 0).applyQuaternion(q);
+      const d = lerp(.62, .46, eio(seg(t, MACRO[0], MACRO[1])));
+      cam = gp.clone().addScaledVector(fwd, d).addScaledVector(up, -.02).addScaledVector(side, -.16);
+      look = gp.clone().addScaledVector(side, -.02).addScaledVector(up, -.03); fov = 26; personVis = true; lbl = { all: 0, hit: 0 };
+    }
   } else { // tutor: wide, slow orbit
-    const yaw = lerp(2.2, 2.9, seg(t, S[5], S[6]));
+    const yaw = lerp(2.2, 3.5, seg(t, S[5], S[6]));
     cam = V(Math.sin(yaw) * 10.5, 3.8, Math.cos(yaw) * 10.5); look = V(0, .3, 0); fov = 34; explodeK = .55; xray = .4; focus = 1; okK = 1;
   }
 
@@ -738,15 +795,17 @@ window.setT = function (t) {
   if (!useHero) {
     person.visible = personVis;
     crust.forEach(m => m.visible = !(t > 49.3 && t < 51.6) && t < 60);
+    const macro = t >= MACRO[0] && t < MACRO[1];
+    lensM.map = macro ? lensTex : lensMap0; lensM.emissiveMap = macro ? lensTex : lensEm0; lensM.needsUpdate = true;
     const active = sm(seg(t, 9.9, 10.4));
-    glasses.userData.lensMats.forEach(m => m.emissiveIntensity = active * 1.4);
+    glasses.userData.lensMats.forEach(m => m.emissiveIntensity = (t >= MACRO[0] && t < MACRO[1]) ? (m === lensM ? 1.8 : .2) : active * 1.4);
     const capture = Math.exp(-Math.pow((t - 13.0) / .12, 2));
     glasses.userData.ledM.color.setRGB(1, 1 - capture * .2, 1 - capture * .2);
     // beam from the glasses to the engine bay
     const gp = new THREE.Vector3(); glasses.getWorldPosition(gp);
     beam.position.copy(gp); beam.lookAt(1.65, .25, .5); beam.scale.set(.7, .7, gp.distanceTo(V(1.65, .25, .5)) / 1.9);
     beam.material.opacity = (.18 * sm(seg(t, 12.6, 12.9)) * (1 - sm(seg(t, 13.3, 13.8))) + .25 * capture) * (personVis ? 1 : 0);
-    blueGlow.position.copy(gp); blueGlow.intensity = 1.2 * active;
+    blueGlow.position.copy(gp); blueGlow.intensity = (t >= MACRO[0] && t < MACRO[1]) ? .15 : 1.2 * active;
     const sweep = seg(t, 14.8, 17.2);
     scanPlane.position.set(lerp(2.4, .6, sweep), .3, .35); scanPlane.material.opacity = .12 * Math.sin(Math.PI * sweep);
     ring.rotation.z = t * .1; ringMat.opacity = .35 + .15 * Math.sin(t * 2);
@@ -761,7 +820,7 @@ window.setT = function (t) {
   }
 
   // ---------- overlays ----------
-  const pov = (t >= 13.6 && t < S[3] + .6) || (t >= S[4] && t < S[5]);
+  const pov = (t >= 13.6 && t < S[3] + .6) || (t >= S[4] && t < S[5] && !(t >= MACRO[0] && t < MACRO[1]));
   const povK = t < S[3] + 1 ? sm(seg(t, 13.6, 14.2)) * (1 - sm(seg(t, 31.0, 31.8))) : sm(seg(t, S[4], S[4] + .5)) * (1 - sm(seg(t, 51.1, 51.6)));
   show('lens', pov ? povK : 0);
   show('reticle', fadeIO(t, 14.2, 19.4), 0, 1 + .25 * Math.sin(t * 3));
@@ -787,7 +846,9 @@ window.setT = function (t) {
   show('chain', fadeIO(t, 35.4, 39.9, .4));
   chain.forEach((_, i) => show('ch' + i, sm(seg(t, 35.6 + i * .7, 36.1 + i * .7)), 0, lerp(.8, 1, sm(seg(t, 35.6 + i * .7, 36.1 + i * .7)))));
   // display card
-  const dk = fadeIO(t, 40.6, 51.2);
+  const inMacro = t >= MACRO[0] && t < MACRO[1];
+  const dk = fadeIO(t, 40.6, 51.2) * (inMacro ? 0 : 1);
+  show('lenschip', fadeIO(t, MACRO[0] + .15, MACRO[1], .25), 12 * (1 - sm(seg(t, MACRO[0] + .15, MACRO[0] + .5))));
   show('display', dk, 30 * (1 - sm(seg(t, 40.6, 41.2))));
   const st = t < 46 ? 0 : 1, sk = st ? sm(seg(t, 46, 46.4)) : 1;
   $('dstep').textContent = `${st + 1} / 4`; $('dtext').textContent = STEPS[st][0]; $('dhint').textContent = t > 49.3 ? '✓ Checked by Ustad — terminals clean' : STEPS[st][1];
@@ -801,14 +862,21 @@ window.setT = function (t) {
   show('tutor', t > 51.6 && t < 60.2 ? 1 : 0);
   ['t1', 't2', 't3'].forEach((id, i) => { const a = 52.8 + i * 1.6; show(id, fadeIO(t, a, 60.0), 40 * (1 - eio(seg(t, a, a + .6)))); });
   show('badge', fadeIO(t, 57.4, 60.0, .4), 0, lerp(.6, 1, eio(seg(t, 57.4, 57.9))));
+  // supervisor dashboard
+  const dsh = fadeIO(t, DASH + .3, S[6] - .1, .5);
+  show('dash', dsh, 30 * (1 - eio(seg(t, DASH + .3, DASH + 1))));
+  ['dr0', 'dr1', 'dr2', 'dr3'].forEach((id, i) => show(id, sm(seg(t, DASH + 1 + i * .35, DASH + 1.4 + i * .35)), 8 * (1 - sm(seg(t, DASH + 1 + i * .35, DASH + 1.4 + i * .35)))));
+  [62, 21, 11, 6].forEach((p, i) => { const k = eio(seg(t, DASH + 1.6 + i * .2, DASH + 3.4)); $('fb' + i).style.width = p * k + '%'; $('fp' + i).textContent = Math.round(p * k) + '%'; });
+  ['jb0', 'jb1', 'jb2'].forEach((id, i) => show(id, sm(seg(t, DASH + 2.6 + i * .4, DASH + 3.0 + i * .4))));
+  show('callx', sm(seg(t, DASH + 3.8, DASH + 4.3)), 0, 1 + .04 * Math.sin(t * 6) * sm(seg(t, DASH + 4.3, DASH + 4.6)));
   // titles
   const titleK = t < S[0] ? sm(seg(t, 1.6, 2.6)) * (1 - sm(seg(t, 5.3, 6))) : sm(seg(t, S[6] + .6, S[6] + 1.6));
-  show('title', titleK, 0, lerp(1.06, 1, sm(seg(t % 60.2, 1.6, 4))));
-  show('tag', t < S[0] ? sm(seg(t, 2.4, 3.2)) : sm(seg(t, 61.4, 62.2)));
-  show('words', t < S[0] ? 0 : sm(seg(t, 62.4, 63.2)), 10 * (1 - sm(seg(t, 62.4, 63.2))));
-  show('meta', t < S[0] ? sm(seg(t, 3.2, 4)) : sm(seg(t, 63.4, 64.2)));
+  show('title', titleK, 0, lerp(1.06, 1, sm(seg(t < S[0] ? t : t - S[6] + 1.6, 1.6, 4))));
+  show('tag', t < S[0] ? sm(seg(t, 2.4, 3.2)) : sm(seg(t, 68.2, 69.0)));
+  show('words', t < S[0] ? 0 : sm(seg(t, 69.2, 70.0)), 10 * (1 - sm(seg(t, 69.2, 70.0))));
+  show('meta', t < S[0] ? sm(seg(t, 3.2, 4)) : sm(seg(t, 70.2, 71.0)));
   // subtitles + waveform
-  const L = t > 60.2 ? null : LINES.find(l => t >= l.t - .1 && t < l.t + l.dur + .35);
+  const L = t > S[6] ? null : LINES.find(l => t >= l.t - .1 && t < l.t + l.dur + .35);
   show('subs', L ? fadeIO(t, L.t - .1, L.t + L.dur + .35, .15) : 0);
   if (L) {
     $('who').className = 'who ' + L.who; $('who').textContent = L.who === 'ustad' ? 'USTAD' : 'TECHNICIAN';
@@ -819,8 +887,8 @@ window.setT = function (t) {
       b.style.background = L.who === 'ustad' ? `hsl(${190 + i * 2.4},100%,62%)` : '#fff'; });
   }
   // scene dips to black
-  let f = 0; [S[0], 31, S[4], S[5], S[6]].forEach(s => f = Math.max(f, Math.exp(-Math.pow((t - s) / .22, 2)) * (s === 31 ? .0 : .95)));
-  f = Math.max(f, 1 - sm(seg(t, 0, .8)), sm(seg(t, 66.6, 67.5)));
+  let f = 0; [S[0], 31, S[4], S[5], DASH, S[6], MACRO[0], MACRO[1]].forEach(s => f = Math.max(f, Math.exp(-Math.pow((t - s) / .22, 2)) * (s === 31 ? .0 : (s === MACRO[0] || s === MACRO[1]) ? .55 : .95)));
+  f = Math.max(f, 1 - sm(seg(t, 0, .8)), sm(seg(t, 73.6, 74.5)));
   show('fade', f);
   grain();
   return true;

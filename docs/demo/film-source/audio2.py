@@ -1,5 +1,5 @@
 import json, numpy as np, soundfile as sf
-SR=44100; D=67.5; N=int(SR*D); t=np.arange(N)/SR
+SR=44100; D=74.5; N=int(SR*D); t=np.arange(N)/SR
 mix=np.zeros((N,2)); rng=np.random.default_rng(3)
 def onepole(x,a):  # simple low-pass
     y=np.empty_like(x); s=0.0
@@ -34,7 +34,7 @@ while s0<D:
     s0+=seglen; k+=1
 pad=lp(pad,900); padR=lp(padR,900)
 # overall pad level shape: soft intro, lift in reasoning/exploded, outro
-shape=np.interp(t,[0,2,6,22,31,40,51.6,60,64,67.5],[0,.7,.55,.65,1,.7,.85,1,.8,0])
+shape=np.interp(t,[0,2,6,22,31,40,51.6,60,64,67,71,74.5],[0,.7,.55,.65,1,.7,.85,.9,.85,1,.8,0])
 mix[:,0]+=pad*shape; mix[:,1]+=padR*shape
 # --- sub pulse (heartbeat kicks) 92 bpm from 6 s
 beat=60/92
@@ -59,17 +59,17 @@ def whoosh(d=1.2,up=True):
         fc=300+ (5000*tt[j]**2 if up else 5000*(1-tt[j])**2); a=1-np.exp(-2*np.pi*fc/SR)
         out[j:j+blk]=onepole(x[j:j+blk],a)
     return out*np.sin(np.pi*tt)**2
-for s in [5.0,13.0,30.4,39.2,50.8,59.4]: add(whoosh(1.2),s,.28)
+for s in [5.0,13.0,30.4,39.2,42.3,44.4,50.8,59.4,66.2]: add(whoosh(1.2),s,.28 if s not in (42.3,44.4) else .14)
 # --- impacts
 def boom():
     n=int(2.5*SR); tt=np.arange(n)/SR; f=38+60*np.exp(-tt*9)
     return (np.sin(2*np.pi*np.cumsum(f)/SR)*np.exp(-tt*2.2)+.25*lp(rng.standard_normal(n),400)*np.exp(-tt*5))
-for s,g in [(.8,.75),(31.75,.8),(60.4,.8)]: add(boom(),s,g)
+for s,g in [(.8,.75),(31.75,.8),(67.2,.8)]: add(boom(),s,g)
 # --- shimmer riser into title / end
 def riser(d):
     n=int(d*SR); tt=np.arange(n)/SR; f=600+2400*(tt/d)**2
     return np.sin(2*np.pi*np.cumsum(f)/SR)*(tt/d)**2*.5
-add(riser(1.6),0.2,.05); add(riser(2.0),58.4,.06)
+add(riser(1.6),0.2,.05); add(riser(2.0),65.2,.06)
 
 # --- footsteps, bonnet latch, gas struts
 def step():
@@ -85,7 +85,7 @@ def blip(f=1800,d=.09):
     n=int(d*SR); tt=np.arange(n)/SR
     return (np.sin(2*np.pi*f*tt)+.4*np.sin(2*np.pi*f*1.5*tt))*np.exp(-tt*45)
 for s,f in [(9.95,1600),(15.3,2000),(17.2,1500),(17.65,1700),(23.4,1900),(24.2,2100),(25.0,2300),(35.6,1400),(36.3,1500),(37.0,1600),(37.7,1800),
-            (40.6,1700),(45.1,2200),(46.0,1700),(52.8,1500),(54.4,1700),(56.0,1900)]:
+            (40.6,1700),(45.1,2200),(46.0,1700),(52.8,1500),(54.4,1700),(56.0,1900),(43.05,2100),(61.2,1500),(61.55,1600),(61.9,1700),(62.25,1800),(64.0,2200)]:
     add(blip(f),s,.22,pan=rng.uniform(-.4,.4)); add(blip(f*1.5),s+.07,.12)
 def chime():  # success
     out=np.zeros(int(.9*SR))
